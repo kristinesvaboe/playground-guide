@@ -8,13 +8,17 @@ A mobile-first Progressive Web App for discovering and planning playground visit
 - Frontend: React (PWA, mobile-first)
 - Backend: .NET (C# Web API)
 - Database: PostgreSQL with PostGIS
-- Maps: OpenStreetMap via Overpass API
+- Maps/Data source: OpenStreetMap data, initially via Overpass API for import and prototyping
 
 **Guiding principles:**
 - Mobile-first always — test every UI decision at 390px width
 - OSM is the source of truth for playground locations; our database holds the enrichment layer
+- Do not query Overpass directly for every user request — import and cache playground data in the database, query Overpass only for imports and data refresh
 - Human-in-the-loop for AI-enriched data — nothing AI-generated goes to users without a review step
 - Keep the architecture simple; this is a side project, not enterprise software
+- Do not store precise user location unless explicitly required by the feature
+- Do not publish user-submitted photos or AI-enriched descriptions without a human review step
+- Do not collect child-related personal data
 
 ---
 
@@ -22,17 +26,33 @@ A mobile-first Progressive Web App for discovering and planning playground visit
 
 You are operating as an **Orchestrator**. When given a ticket, you manage the full development pipeline by running the appropriate agents in sequence. You do not write code directly — you delegate to agents and synthesize their outputs.
 
+> **Subagents:** Each agent role is defined as a native Claude Code subagent in `.claude/agents/`. The orchestrator spawns each subagent with only the context relevant to its task — the diff, the ticket criteria, and any outputs from prior agents. Subagents do not read this file; all project context is passed by the orchestrator at runtime.
+
 ### How to handle a ticket
 
-1. Read the ticket and reason about which agents are needed and in what order
-2. Run each agent in sequence, passing relevant context between them
-3. Loop Implementation → QA until QA passes (max 3 iterations; surface to human if still failing after 3)
-4. Run optional agents (Data, Security/Architecture) when their trigger conditions apply
-5. Present the final output for human review before any merge
+For **small tasks** (a one-file change, a config tweak, a quick fix) where the human explicitly says so: skip the branch/PR flow and make the change locally. Still run QA. No PR needed.
+
+For **all other tickets:**
+
+1. Create a feature branch named `feature/ISSUE_NUMBER-short-description` (e.g. `feature/1-project-scaffold`)
+2. Read the ticket and reason about which agents are needed and in what order
+3. Run the relevant agents in sequence, passing context between them
+4. Loop Implementation → QA until QA passes (max 3 iterations; surface to human if still failing after 3)
+5. Run Review agent after QA passes
+6. Run optional agents (Data, Security/Architecture, UX/Product) when their trigger conditions apply
+7. Open a PR to `main` with the summary from the human review gate — this is the HITL checkpoint
+8. Wait. Human approval = merging the PR. Do not merge yourself.
 
 ### Loop exit condition
 
-QA is satisfied when there are zero errors. Warnings are acceptable. If QA still reports errors after 3 loops, stop and explain what's blocking.
+QA is satisfied when both of the following are true:
+1. **Static review** — zero errors found in the diff (warnings are acceptable)
+2. **Test execution** — run tests for the parts of the codebase touched by the ticket:
+   - Backend: `dotnet test` — only if a backend project exists
+   - Frontend: `npm test` — only if a frontend project exists
+   - If no test project exists yet, report that explicitly rather than inventing or skipping tests
+
+If QA still reports errors after 3 loops, stop and explain what's blocking. Do not attempt a fourth loop.
 
 ---
 
@@ -48,8 +68,21 @@ Reads the ticket. Decides which agents to run and in what order. Passes outputs 
 
 ### QA agent
 **Trigger:** Every ticket, after Implementation.
-**Role:** Review the diff produced by the Implementation agent. Look for bugs, missing edge cases, unhandled errors at system boundaries (user input, external APIs), and mobile UX issues. Do not fix anything — report findings only.
-**Output:** A list of issues categorised as ERROR (must fix) or WARNING (acceptable). If no issues, output: "QA passed."
+**Role:** Two-step process — do not skip either step.
+1. **Static review:** Read the diff. Look for bugs, missing edge cases, unhandled errors at system boundaries (user input, external APIs), and mobile UX issues.
+2. **Test execution:** Run the relevant tests as described in the loop exit condition above. Report any failures verbatim.
+Do not fix anything — report findings only.
+**Output:** A list of issues categorised as ERROR (must fix) or WARNING (acceptable), plus test results. If both steps are clean, output: "QA passed."
+
+### Review agent
+**Trigger:** Every ticket, after QA passes.
+**Role:** Review the diff for code quality, readability, and maintainability. Check that naming is clear, that the implementation follows the conventions in this file, and that there is no unnecessary duplication or complexity. Do not fix anything — report findings only. Do not raise issues already caught by QA.
+**Output:** Findings are normally WARNINGs. Only flag as blocking if the implementation explicitly violates a project convention or would make the code significantly harder to maintain. If nothing to flag, output: "Review passed."
+
+### UX/Product agent
+**Trigger:** Any ticket that touches screens, navigation, filters, the playground detail view, add/edit flows, or any user-facing copy.
+**Role:** Review the user flow, mobile usability, information hierarchy, and whether the feature helps parents make a practical decision quickly. Keep UI simple and mobile-first. Check that the design works at 390px width. Flag anything that adds friction or would feel awkward at a playground with one hand on a pushchair.
+**Output:** UX findings and suggested adjustments. If nothing to flag, output: "UX review passed."
 
 ### Data agent
 **Trigger:** Any ticket that touches OSM queries, PostGIS, database schema, or migrations.
@@ -87,10 +120,14 @@ Reads the ticket. Decides which agents to run and in what order. Passes outputs 
 
 ## Human review gate
 
-At the end of every ticket pipeline, present:
-1. A one-paragraph summary of what was built
-2. The QA result (passed / warnings)
-3. Any flags from Data or Security/Architecture agents
-4. Files changed
+When the pipeline is complete, open a PR to `main`. The PR description must be written so a non-specialist reviewer can understand what was built and why. Include:
 
-Wait for explicit approval before considering the ticket done.
+1. **What changed functionally** — what the app can now do that it couldn't before, in plain language from the user's perspective
+2. **What changed technically** — what was built and why those specific technical choices were made; include alternatives that were considered and why they were rejected
+3. **QA result** — passed / warnings, including test run output
+4. **Review agent findings** — warnings only
+5. **UX/Product findings** — if triggered
+6. **Data or Security/Architecture flags** — if triggered
+7. **Files changed**
+
+Human approval = merging the PR. If the reviewer leaves comments requesting changes, treat each comment as a new brief and re-run the relevant agents on the same branch before requesting re-review.
