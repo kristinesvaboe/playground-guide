@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore.Migrations;
 using NetTopologySuite.Geometries;
 
@@ -40,7 +39,7 @@ namespace PlaygroundGuide.Api.Migrations
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     PlaygroundId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Equipment = table.Column<List<string>>(type: "text[]", nullable: false),
+                    Equipment = table.Column<string[]>(type: "text[]", nullable: false),
                     Parking = table.Column<string>(type: "text", nullable: true),
                     Notes = table.Column<string>(type: "text", nullable: true),
                     Reviewed = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false)
