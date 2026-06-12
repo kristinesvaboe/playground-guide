@@ -34,6 +34,30 @@ This project is as much a learning exercise as it is a real app. It's built usin
 
 The goal is to learn modern agentic development patterns — orchestration, subagent design, and effective human oversight — while building something genuinely useful.
 
+## Admin API
+
+### Import playgrounds from OpenStreetMap
+
+```
+POST /admin/import/osm
+X-Admin-Key: <your-admin-key>
+```
+
+Fetches all `leisure=playground` nodes within Rogaland (bounding box `57.8,5.3,59.7,7.0`) from the Overpass API and upserts them into the database. Re-running is safe — existing records are updated by OSM node ID; enrichment data is never touched.
+
+Returns:
+```json
+{ "created": 42, "updated": 7 }
+```
+
+**Setup:** Set `AdminKey` in `appsettings.Development.json` (or via environment variable `AdminKey`) to a secret value of your choice. The placeholder value `"change-me"` in `appsettings.json` must be overridden before use.
+
+```json
+{
+  "AdminKey": "your-secret-key-here"
+}
+```
+
 ## Status
 
 Early scaffolding. Watch this space.
