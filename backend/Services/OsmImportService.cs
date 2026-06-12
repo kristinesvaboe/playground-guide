@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +14,8 @@ public class OsmImportService(HttpClient httpClient, ILogger<OsmImportService> l
 
     public async Task<(int created, int updated)> ImportRogalandAsync(AppDbContext db)
     {
-        var content = new StringContent(
-            $"data={Uri.EscapeDataString(OverpassQuery)}",
-            Encoding.UTF8,
-            "application/x-www-form-urlencoded"
+        var content = new FormUrlEncodedContent(
+            [new KeyValuePair<string, string>("data", OverpassQuery)]
         );
 
         var response = await httpClient.PostAsync("interpreter", content);
