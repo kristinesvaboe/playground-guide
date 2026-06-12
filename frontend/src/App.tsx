@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import iconUrl from 'leaflet/dist/images/marker-icon.png?url'
-import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png?url'
-import shadowUrl from 'leaflet/dist/images/marker-shadow.png?url'
+import iconUrl from 'leaflet/dist/images/marker-icon.png'
+import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
+import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 
-// Vite breaks Leaflet's default icon asset resolution; supply the paths explicitly
+// Leaflet's _getIconUrl prototype method ignores mergeOptions; delete it so the options are used instead
+delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl })
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5100'
