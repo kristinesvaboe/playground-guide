@@ -3,6 +3,7 @@
 # .NET
 backend/bin/
 backend/obj/
+backend/appsettings.Development.json
 
 # Node
 frontend/node_modules/
