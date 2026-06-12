@@ -5,9 +5,6 @@ backend/bin/
 backend/obj/
 backend/appsettings.Development.json
 
-# Local env (copy .env.example to .env and fill in values)
-.env
-
 # Node
 frontend/node_modules/
 frontend/dist/

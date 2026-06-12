@@ -2,9 +2,9 @@ services:
   db:
     image: postgis/postgis:17-3.5
     environment:
-      POSTGRES_DB: ${DB_NAME:-playgroundguide}
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: playgroundguide
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
