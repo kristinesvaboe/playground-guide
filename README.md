@@ -34,6 +34,13 @@ This project is as much a learning exercise as it is a real app. It's built usin
 
 The goal is to learn modern agentic development patterns — orchestration, subagent design, and effective human oversight — while building something genuinely useful.
 
+## API endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Returns `{ "status": "ok" }` |
+| `GET` | `/playgrounds?lat=&lng=&radius=` | Returns playgrounds within `radius` metres of the given coordinates. All three query params are required. Response: array of `{ id, name, latitude, longitude }`. |
+
 ## Status
 
-Early scaffolding. Watch this space.
+Map view is live — the app shows playgrounds near your current location using OpenStreetMap data.
