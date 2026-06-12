@@ -96,6 +96,14 @@ Do not fix anything — report findings only.
 
 ---
 
+## Commit and branch conventions
+
+- Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`
+- Branch names follow the pattern `feature/ISSUE_NUMBER-short-description`
+- GitHub issue titles also follow Conventional Commits format (e.g. `feat: project scaffold`)
+
+---
+
 ## Coding conventions
 
 - **Frontend:** Functional React components, TypeScript, no class components
