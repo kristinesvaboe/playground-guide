@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace PlaygroundGuide.Api.Models;
 
@@ -12,8 +11,7 @@ public class PlaygroundEnrichment
 
     public Playground Playground { get; set; } = null!;
 
-    [Column(TypeName = "text[]")]
-    public List<string> Equipment { get; set; } = [];
+    public List<EquipmentType> Equipment { get; set; } = [];
 
     public string? Parking { get; set; }
 
