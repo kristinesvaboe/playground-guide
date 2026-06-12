@@ -30,7 +30,9 @@ Data sourced from [OpenStreetMap](https://www.openstreetmap.org/), enriched by u
 
 ## Development approach
 
-This project is being built using an agentic development workflow with Claude Code — an orchestrator agent manages subagents for UX, implementation, QA, and review. A good excuse to learn modern agentic development patterns while building something genuinely useful.
+This project is as much a learning exercise as it is a real app. It's built using an agentic development workflow with Claude Code — an orchestrator agent manages specialised subagents for implementation, QA, code review, UX, and security. Every ticket goes through a human-in-the-loop review gate before merging: the agents do the work, the human decides what ships.
+
+The goal is to learn modern agentic development patterns — orchestration, subagent design, and effective human oversight — while building something genuinely useful.
 
 ## Status
 
