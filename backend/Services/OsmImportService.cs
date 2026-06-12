@@ -1,3 +1,5 @@
+using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
@@ -14,9 +16,9 @@ public class OsmImportService(HttpClient httpClient, ILogger<OsmImportService> l
 
     public async Task<(int created, int updated)> ImportRogalandAsync(AppDbContext db)
     {
-        var content = new FormUrlEncodedContent(
-            [new KeyValuePair<string, string>("data", OverpassQuery)]
-        );
+        // Overpass requires the query unencoded in the body — percent-encoding causes 406.
+        var content = new ByteArrayContent(Encoding.UTF8.GetBytes($"data={OverpassQuery}"));
+        content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded");
 
         var response = await httpClient.PostAsync("interpreter", content);
         response.EnsureSuccessStatusCode();
