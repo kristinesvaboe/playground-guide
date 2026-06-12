@@ -111,6 +111,7 @@ Do not fix anything — report findings only.
 - **Database:** Migrations managed in code (not manual SQL scripts)
 - **Tests:** Write tests for business logic and API endpoints; skip tests for pure UI layout
 - **No over-engineering:** Three similar lines of code is better than a premature abstraction
+- **README:** Update README.md when a ticket changes how to run the app locally, adds a new service, or changes setup steps
 
 ---
 
