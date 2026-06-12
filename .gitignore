@@ -3,6 +3,8 @@
 # .NET
 backend/bin/
 backend/obj/
+# Note: appsettings.Development.json is tracked and safe — it only contains local dev defaults.
+# If you ever move real secrets here, add it to .gitignore at that point.
 
 # Node
 frontend/node_modules/
