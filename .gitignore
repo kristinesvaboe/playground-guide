@@ -3,8 +3,10 @@
 # .NET
 backend/bin/
 backend/obj/
-# Note: appsettings.Development.json is tracked and safe — it only contains local dev defaults.
-# If you ever move real secrets here, add it to .gitignore at that point.
+backend/appsettings.Development.json
+
+# Local env (copy .env.example to .env and fill in values)
+.env
 
 # Node
 frontend/node_modules/
