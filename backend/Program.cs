@@ -55,3 +55,5 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, AppD
 
     return Results.Ok(playgrounds);
 });
+
+app.Run();

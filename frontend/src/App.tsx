@@ -9,7 +9,7 @@ import shadowUrl from 'leaflet/dist/images/marker-shadow.png?url'
 // Vite breaks Leaflet's default icon asset resolution; supply the paths explicitly
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl })
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000'
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5100'
 const STAVANGER: [number, number] = [58.9700, 5.7331]
 
 type Playground = {
