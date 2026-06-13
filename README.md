@@ -76,10 +76,13 @@ npm run test:e2e
 |--------|------|-------------|
 | `GET` | `/health` | Returns `{ "status": "ok" }` |
 | `GET` | `/playgrounds?lat=&lng=&radius=` | Returns playgrounds within `radius` metres of the given coordinates. All three params required. Response: `[{ id, name, latitude, longitude }]`. |
-| `GET` | `/playgrounds/{id}` | Returns a single playground with reviewed equipment tags. `equipment` is `null` if no enrichment exists yet, or an array (possibly empty) if it does. |
+| `GET` | `/playgrounds/{id}?userId=` | Returns a single playground with reviewed equipment tags. `equipment` is `null` if no enrichment exists yet, or an array (possibly empty) if it does. If `userId` is supplied and matches a known user with an enrichment for this playground, also returns `myEnrichment` (the caller's own data, reviewed or not); otherwise `myEnrichment` is `null`. |
+| `POST` | `/playgrounds/{id}/enrichment` | Creates the calling user's enrichment for a playground. Body: `{ userId, equipment, transportInfo, notes }`. All detail fields are optional, but at least one of `equipment`, `transportInfo`, or `notes` must be provided (400 otherwise). Server-validates `transportInfo` (≤200 chars), `notes` (≤300 chars), and known equipment values. Saved as unreviewed. 409 if the user already has one (use PUT). |
+| `PUT` | `/playgrounds/{id}/enrichment` | Updates the calling user's existing enrichment (same body/validation as POST). Any edit resets it to unreviewed so it isn't shown publicly until re-approved. 404 if none exists yet. |
 
 ## Status
 
 - Map view shows playgrounds near your current location using OpenStreetMap data
 - Tapping a pin shows a preview card with the playground name and equipment tags
 - Equipment data comes from reviewed enrichments; unreviewed data is never shown
+- Users can add or edit playground details (equipment, transport info, notes — all optional, but at least one is required) via a mobile-first bottom-sheet form; submissions are held for review and only visible to their author until approved

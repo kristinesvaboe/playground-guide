@@ -6,6 +6,7 @@ import './App.css'
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
+import EnrichmentForm, { type Enrichment, type EnrichmentDraft } from './EnrichmentForm'
 
 // Leaflet's _getIconUrl prototype method ignores mergeOptions; delete it so the options are used instead
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -13,6 +14,19 @@ L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl })
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5100'
 const STAVANGER: [number, number] = [58.9700, 5.7331]
+
+// Placeholder identity until authentication exists; matches AppDbContext.SeedUserId
+const CURRENT_USER_ID = 'a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d'
+
+const EQUIPMENT_LABELS: Record<string, string> = {
+  Swing: 'Swing',
+  Trampoline: 'Trampoline',
+  Slide: 'Slide',
+  ClimbingFrame: 'Climbing frame',
+  Sandpit: 'Sandpit',
+  Springy: 'Springy rider',
+  Roundabout: 'Roundabout',
+}
 
 type Playground = {
   id: string
@@ -25,6 +39,7 @@ type PlaygroundPreview = {
   id: string
   name: string | null
   equipment: string[] | null
+  myEnrichment: Enrichment | null
 }
 
 function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
@@ -37,6 +52,13 @@ function App() {
   const [playgrounds, setPlaygrounds] = useState<Playground[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [preview, setPreview] = useState<PlaygroundPreview | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
+
+  function loadPreview(id: string) {
+    return fetch(`${API_URL}/playgrounds/${id}?userId=${CURRENT_USER_ID}`)
+      .then((res) => res.json())
+      .then(setPreview)
+  }
 
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -61,15 +83,34 @@ function App() {
   useEffect(() => {
     if (!selectedId) {
       setPreview(null)
+      setFormOpen(false)
       return
     }
-    fetch(`${API_URL}/playgrounds/${selectedId}`)
-      .then((res) => res.json())
-      .then(setPreview)
-      .catch(() => {})
+    loadPreview(selectedId).catch(() => {})
   }, [selectedId])
 
+  async function handleSave(draft: EnrichmentDraft) {
+    if (!selectedId) return
+    const method = preview?.myEnrichment ? 'PUT' : 'POST'
+    const res = await fetch(`${API_URL}/playgrounds/${selectedId}/enrichment`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: CURRENT_USER_ID, ...draft }),
+    })
+    if (!res.ok) {
+      const message = await res
+        .json()
+        .then((body) => body?.error as string | undefined)
+        .catch(() => undefined)
+      throw new Error(message ?? "Couldn't save — please try again.")
+    }
+    await loadPreview(selectedId)
+    setFormOpen(false)
+  }
+
   if (!position) return null
+
+  const pending = preview?.myEnrichment && !preview.myEnrichment.reviewed
 
   return (
     <>
@@ -87,7 +128,7 @@ function App() {
           />
         ))}
       </MapContainer>
-      {preview && (
+      {preview && !formOpen && (
         <div className="preview-card">
           <div className="preview-card-header">
             <h2>{preview.name ?? 'Playground'}</h2>
@@ -99,21 +140,48 @@ function App() {
               ×
             </button>
           </div>
-          {preview.equipment === null && (
+
+          {pending && (
+            <>
+              <span className="pending-badge">Pending review — only you can see this</span>
+              <div className="equipment-tags">
+                {preview.myEnrichment!.equipment.map((eq) => (
+                  <span key={eq} className="equipment-tag">{EQUIPMENT_LABELS[eq] ?? eq}</span>
+                ))}
+              </div>
+              {preview.myEnrichment!.notes && (
+                <p className="pending-notes">{preview.myEnrichment!.notes}</p>
+              )}
+            </>
+          )}
+
+          {!pending && preview.equipment === null && (
             <p className="muted">No details added yet</p>
           )}
-          {preview.equipment !== null && preview.equipment.length === 0 && (
+          {!pending && preview.equipment !== null && preview.equipment.length === 0 && (
             <p className="muted">No equipment listed</p>
           )}
-          {preview.equipment !== null && preview.equipment.length > 0 && (
+          {!pending && preview.equipment !== null && preview.equipment.length > 0 && (
             <div className="equipment-tags">
               {preview.equipment.map((eq) => (
-                <span key={eq} className="equipment-tag">{eq}</span>
+                <span key={eq} className="equipment-tag">{EQUIPMENT_LABELS[eq] ?? eq}</span>
               ))}
             </div>
           )}
-          <button className="view-details-btn" disabled>View details</button>
+
+          <button className="details-btn" onClick={() => setFormOpen(true)}>
+            {preview.myEnrichment ? 'Edit details' : 'Add details'}
+          </button>
         </div>
+      )}
+
+      {preview && formOpen && (
+        <EnrichmentForm
+          playgroundName={preview.name}
+          initial={preview.myEnrichment}
+          onCancel={() => setFormOpen(false)}
+          onSave={handleSave}
+        />
       )}
     </>
   )

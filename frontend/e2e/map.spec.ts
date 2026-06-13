@@ -55,13 +55,13 @@ test.describe('map interactions', () => {
     await expect(page.locator('.preview-card')).not.toBeVisible()
   })
 
-  test('"View details" button is visible and disabled', async ({ page }) => {
+  test('the details button is visible and enabled', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible({ timeout: 10000 })
     await page.locator('.leaflet-marker-icon').first().click()
     await expect(page.locator('.preview-card')).toBeVisible()
-    await expect(page.locator('.view-details-btn')).toBeVisible()
-    await expect(page.locator('.view-details-btn')).toBeDisabled()
+    await expect(page.locator('.details-btn')).toBeVisible()
+    await expect(page.locator('.details-btn')).toBeEnabled()
   })
 })
 
