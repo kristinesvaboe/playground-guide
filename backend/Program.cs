@@ -152,22 +152,23 @@ app.MapGet("/admin/enrichments", async (HttpContext ctx, IConfiguration cfg, App
     if (!AdminKeyValid(ctx, cfg))
         return Results.StatusCode(401);
 
-    var pending = await db.PlaygroundEnrichments
+    var entities = await db.PlaygroundEnrichments
         .AsNoTracking()
         .Where(e => !e.Reviewed)
         .Include(e => e.Playground)
         .OrderByDescending(e => e.CreatedAt)
-        .Select(e => new
-        {
-            e.Id,
-            e.PlaygroundId,
-            PlaygroundName = e.Playground.Name,
-            Equipment = e.Equipment.Select(eq => eq.ToString()).ToList(),
-            e.TransportInfo,
-            e.Notes,
-            e.CreatedAt,
-        })
         .ToListAsync();
+
+    var pending = entities.Select(e => new
+    {
+        e.Id,
+        e.PlaygroundId,
+        PlaygroundName = e.Playground.Name,
+        Equipment = e.Equipment.Select(eq => eq.ToString()).ToList(),
+        e.TransportInfo,
+        e.Notes,
+        e.CreatedAt,
+    });
 
     return Results.Ok(pending);
 });
