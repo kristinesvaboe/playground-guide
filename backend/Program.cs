@@ -77,7 +77,7 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
         : reviewed.SelectMany(e => e.Equipment).Distinct().Select(e => e.ToString()).ToList();
 
     object? myEnrichment = null;
-    if (userId is not null && await db.Users.AnyAsync(u => u.Id == userId))
+    if (userId is not null)
     {
         // Only ever the caller's own row — never another user's unreviewed data
         var mine = await db.PlaygroundEnrichments
@@ -168,7 +168,7 @@ static async Task<(IResult? Error, List<EquipmentType>? Equipment)> ValidateEnri
     if (!string.IsNullOrWhiteSpace(body.TransportInfo) && body.TransportInfo.Trim().Length > 200)
         return (Results.BadRequest(new { error = "transportInfo must be 200 characters or fewer." }), null);
 
-    if (body.Notes is not null && body.Notes.Length > 300)
+    if (!string.IsNullOrWhiteSpace(body.Notes) && body.Notes.Trim().Length > 300)
         return (Results.BadRequest(new { error = "notes must be 300 characters or fewer." }), null);
 
     var equipment = new List<EquipmentType>();

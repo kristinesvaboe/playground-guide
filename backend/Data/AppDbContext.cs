@@ -53,6 +53,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                   .WithMany(u => u.Enrichments)
                   .HasForeignKey(e => e.UserId)
                   .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(e => new { e.PlaygroundId, e.UserId }).IsUnique();
         });
 
         modelBuilder.Entity<User>(entity =>

@@ -104,7 +104,7 @@ function App() {
         .catch(() => undefined)
       throw new Error(message ?? "Couldn't save — please try again.")
     }
-    await loadPreview(selectedId)
+    await loadPreview(selectedId).catch(() => {})
     setFormOpen(false)
   }
 
