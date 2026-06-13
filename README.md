@@ -34,13 +34,52 @@ This project is as much a learning exercise as it is a real app. It's built usin
 
 The goal is to learn modern agentic development patterns — orchestration, subagent design, and effective human oversight — while building something genuinely useful.
 
+## Running locally
+
+**Prerequisites:** Docker, .NET 10 SDK, Node 18+
+
+```bash
+# Start PostgreSQL with PostGIS
+docker compose up -d
+
+# Backend (runs on http://localhost:5100, applies migrations on startup)
+cd backend
+dotnet run
+
+# Frontend (runs on http://localhost:5173)
+cd frontend
+npm install
+npm run dev
+```
+
+Backend config (connection string, admin key) goes in `backend/appsettings.Development.json` — this file is gitignored and must be created locally:
+
+```json
+{
+  "ConnectionStrings": { "Default": "Host=localhost;Port=5432;Database=playgroundguide;Username=postgres;Password=postgres" },
+  "AdminKey": "your-local-key"
+}
+```
+
+## Running E2E tests
+
+With the full stack running (Docker + backend + frontend dev server):
+
+```bash
+cd frontend
+npm run test:e2e
+```
+
 ## API endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Returns `{ "status": "ok" }` |
-| `GET` | `/playgrounds?lat=&lng=&radius=` | Returns playgrounds within `radius` metres of the given coordinates. All three query params are required. Response: array of `{ id, name, latitude, longitude }`. |
+| `GET` | `/playgrounds?lat=&lng=&radius=` | Returns playgrounds within `radius` metres of the given coordinates. All three params required. Response: `[{ id, name, latitude, longitude }]`. |
+| `GET` | `/playgrounds/{id}` | Returns a single playground with reviewed equipment tags. `equipment` is `null` if no enrichment exists yet, or an array (possibly empty) if it does. |
 
 ## Status
 
-Map view is live — the app shows playgrounds near your current location using OpenStreetMap data.
+- Map view shows playgrounds near your current location using OpenStreetMap data
+- Tapping a pin shows a preview card with the playground name and equipment tags
+- Equipment data comes from reviewed enrichments; unreviewed data is never shown
