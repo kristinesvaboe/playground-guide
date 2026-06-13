@@ -116,6 +116,7 @@ app.MapPost("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReque
         TransportInfo = string.IsNullOrWhiteSpace(body.TransportInfo) ? null : body.TransportInfo.Trim(),
         Notes = string.IsNullOrWhiteSpace(body.Notes) ? null : body.Notes.Trim(),
         Reviewed = false,
+        CreatedAt = DateTimeOffset.UtcNow,
     };
 
     db.PlaygroundEnrichments.Add(enrichment);
@@ -144,6 +145,59 @@ app.MapPut("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReques
     await db.SaveChangesAsync();
 
     return Results.Ok(ToEnrichmentResponse(enrichment));
+});
+
+app.MapGet("/admin/enrichments", async (HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var pending = await db.PlaygroundEnrichments
+        .AsNoTracking()
+        .Where(e => !e.Reviewed)
+        .Include(e => e.Playground)
+        .OrderByDescending(e => e.CreatedAt)
+        .Select(e => new
+        {
+            e.Id,
+            e.PlaygroundId,
+            PlaygroundName = e.Playground.Name,
+            Equipment = e.Equipment.Select(eq => eq.ToString()).ToList(),
+            e.TransportInfo,
+            e.Notes,
+            e.CreatedAt,
+        })
+        .ToListAsync();
+
+    return Results.Ok(pending);
+});
+
+app.MapPost("/admin/enrichments/{id:guid}/approve", async (Guid id, HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var enrichment = await db.PlaygroundEnrichments.FindAsync(id);
+    if (enrichment is null)
+        return Results.NotFound(new { error = "Enrichment not found." });
+
+    enrichment.Reviewed = true;
+    await db.SaveChangesAsync();
+    return Results.Ok(new { status = "approved" });
+});
+
+app.MapDelete("/admin/enrichments/{id:guid}", async (Guid id, HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var enrichment = await db.PlaygroundEnrichments.FindAsync(id);
+    if (enrichment is null)
+        return Results.NotFound(new { error = "Enrichment not found." });
+
+    db.PlaygroundEnrichments.Remove(enrichment);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
 });
 
 app.Run();
@@ -183,6 +237,14 @@ static async Task<(IResult? Error, List<EquipmentType>? Equipment)> ValidateEnri
         return (Results.BadRequest(new { error = "Add at least one detail (equipment, transport info, or notes)." }), null);
 
     return (null, equipment);
+}
+
+static bool AdminKeyValid(HttpContext ctx, IConfiguration cfg)
+{
+    var configuredKey = cfg["AdminKey"];
+    return !string.IsNullOrEmpty(configuredKey)
+        && ctx.Request.Headers.TryGetValue("X-Admin-Key", out var key)
+        && key == configuredKey;
 }
 
 record EnrichmentRequest(

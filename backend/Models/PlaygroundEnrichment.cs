@@ -22,4 +22,6 @@ public class PlaygroundEnrichment
     public string? Notes { get; set; }
 
     public bool Reviewed { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
 }

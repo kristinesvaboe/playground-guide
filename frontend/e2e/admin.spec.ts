@@ -1,0 +1,94 @@
+import { test, expect } from '@playwright/test'
+
+const MOCK_SUBMISSION = {
+  id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+  playgroundId: '11111111-2222-3333-4444-555555555555',
+  playgroundName: 'Stavanger Leikeplass',
+  equipment: ['Swing', 'Slide'],
+  transportInfo: 'Bus 11 from city centre',
+  notes: null,
+  createdAt: '2026-06-10T12:00:00Z',
+}
+
+test.describe('admin review page', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile-390', 'interaction tests run on chromium only')
+  })
+
+  test('shows submission cards after loading', async ({ page }) => {
+    await page.route('**/admin/enrichments', (route) =>
+      route.fulfill({ json: [MOCK_SUBMISSION] })
+    )
+    await page.goto('/admin/review')
+    await expect(page.locator('.submission-card')).toBeVisible()
+    await expect(page.getByText('Stavanger Leikeplass')).toBeVisible()
+    await expect(page.getByText('Swing')).toBeVisible()
+    await expect(page.getByText('Slide')).toBeVisible()
+  })
+
+  test('approve removes the card and shows empty state', async ({ page }) => {
+    await page.route('**/admin/enrichments', (route) =>
+      route.fulfill({ json: [MOCK_SUBMISSION] })
+    )
+    await page.route('**/admin/enrichments/*/approve', (route) =>
+      route.fulfill({ json: { status: 'approved' } })
+    )
+    await page.goto('/admin/review')
+    await expect(page.locator('.submission-card')).toBeVisible()
+    await page.locator('.btn-approve').click()
+    await expect(page.locator('.submission-card')).not.toBeVisible()
+    await expect(page.getByText('No pending submissions.')).toBeVisible()
+  })
+
+  test('reject prompts for confirmation then removes the card', async ({ page }) => {
+    await page.route('**/admin/enrichments', (route) =>
+      route.fulfill({ json: [MOCK_SUBMISSION] })
+    )
+    await page.route('**/admin/enrichments/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', (route) => {
+      if (route.request().method() === 'DELETE')
+        route.fulfill({ json: { status: 'deleted' } })
+    })
+    page.on('dialog', (d) => d.accept())
+    await page.goto('/admin/review')
+    await expect(page.locator('.submission-card')).toBeVisible()
+    await page.locator('.btn-reject').click()
+    await expect(page.locator('.submission-card')).not.toBeVisible()
+    await expect(page.getByText('No pending submissions.')).toBeVisible()
+  })
+
+  test('approve failure restores the card with an error', async ({ page }) => {
+    await page.route('**/admin/enrichments', (route) =>
+      route.fulfill({ json: [MOCK_SUBMISSION] })
+    )
+    await page.route('**/admin/enrichments/*/approve', (route) =>
+      route.fulfill({ status: 500, json: { error: 'Server error' } })
+    )
+    await page.goto('/admin/review')
+    await expect(page.locator('.submission-card')).toBeVisible()
+    await page.locator('.btn-approve').click()
+    await expect(page.locator('.submission-card')).toBeVisible()
+    await expect(page.locator('.card-error')).toBeVisible()
+  })
+
+  test('empty state shown when no submissions pending', async ({ page }) => {
+    await page.route('**/admin/enrichments', (route) =>
+      route.fulfill({ json: [] })
+    )
+    await page.goto('/admin/review')
+    await expect(page.getByText('No pending submissions.')).toBeVisible()
+  })
+})
+
+test.describe('admin page 390px layout', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
+  })
+
+  test('admin page and submission card fit within 390px viewport', async ({ page }) => {
+    await page.route('**/admin/enrichments', (route) =>
+      route.fulfill({ json: [MOCK_SUBMISSION] })
+    )
+    await page.goto('/admin/review')
+    await expect(page.locator('.submission-card')).toBeInViewport()
+  })
+})
