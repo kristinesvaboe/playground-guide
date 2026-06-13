@@ -56,4 +56,22 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, AppD
     return Results.Ok(playgrounds);
 });
 
+app.MapGet("/playgrounds/{id:guid}", async (Guid id, AppDbContext db) =>
+{
+    var playground = await db.Playgrounds
+        .AsNoTracking()
+        .Include(p => p.Enrichments.Where(e => e.Reviewed))
+        .FirstOrDefaultAsync(p => p.Id == id);
+
+    if (playground is null)
+        return Results.NotFound();
+
+    // null signals "no enrichment data yet"; empty list means enrichment exists but no equipment recorded
+    var equipment = playground.Enrichments.Count == 0
+        ? null
+        : playground.Enrichments.SelectMany(e => e.Equipment).Distinct().Select(e => e.ToString()).ToList();
+
+    return Results.Ok(new { playground.Id, playground.Name, Equipment = equipment });
+});
+
 app.Run();

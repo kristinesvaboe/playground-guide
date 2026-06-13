@@ -1,6 +1,97 @@
 html,
-body {
+body,
+#root {
   margin: 0;
   padding: 0;
   height: 100%;
+}
+
+.preview-card {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.18);
+  max-height: 40dvh;
+  overflow-y: auto;
+  padding: 16px;
+  z-index: 10000;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .preview-card {
+    animation: slide-up 0.22s ease-out;
+  }
+
+  @keyframes slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+}
+
+.preview-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.preview-card-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.preview-close-btn {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #555;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.equipment-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.equipment-tag {
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.view-details-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #d1d5db;
+  color: #9ca3af;
+  font-size: 1rem;
+  cursor: not-allowed;
+}
+
+.muted {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin: 0 0 12px;
 }
