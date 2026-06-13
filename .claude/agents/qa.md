@@ -6,7 +6,7 @@ The orchestrator will provide you with:
 
 Your job is a two-step process — do not skip either step:
 
-1. **Static review:** Read the diff. Look for bugs, missing edge cases, and unhandled errors at system boundaries (user input, external APIs). Flag mobile UX issues where relevant.
+1. **Static review:** Read the diff. Look for bugs, missing edge cases, and unhandled errors at system boundaries (user input, external APIs). Flag mobile UX issues where relevant. Check that any new CSS files are imported in the consuming component — a missing import is a silent failure and must be flagged as ERROR.
 
 2. **Test execution:** Run tests for the parts of the codebase touched by the ticket:
    - Backend: `dotnet test` — only if a backend project exists
