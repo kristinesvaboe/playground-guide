@@ -97,7 +97,13 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: CURRENT_USER_ID, ...draft }),
     })
-    if (!res.ok) return
+    if (!res.ok) {
+      const message = await res
+        .json()
+        .then((body) => body?.error as string | undefined)
+        .catch(() => undefined)
+      throw new Error(message ?? "Couldn't save — please try again.")
+    }
     await loadPreview(selectedId)
     setFormOpen(false)
   }

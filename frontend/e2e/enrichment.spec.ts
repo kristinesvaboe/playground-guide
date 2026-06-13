@@ -53,6 +53,19 @@ test.describe('enrichment form (chromium)', () => {
     await expect(page.locator('.enrichment-form')).not.toBeVisible()
     await expect(page.locator('.pending-badge')).toBeVisible()
   })
+
+  test('a failed save shows an inline error and keeps the form open', async ({ page }) => {
+    // Mock the save so this test never writes to the DB.
+    await page.route('**/enrichment', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
+    )
+    await openPreview(page)
+    await page.locator('.details-btn').click()
+    await page.locator('#transport').fill('Free car park next to the entrance')
+    await page.locator('.btn-primary').click()
+    await expect(page.locator('.save-error')).toBeVisible()
+    await expect(page.locator('.enrichment-form')).toBeVisible()
+  })
 })
 
 test.describe('enrichment form 390px layout', () => {

@@ -74,6 +74,7 @@ export default function EnrichmentForm({
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(initial?.transportLocation ?? null)
   const [showPinMap, setShowPinMap] = useState(false)
   const [transportError, setTransportError] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const transportRef = useRef<HTMLTextAreaElement>(null)
 
@@ -91,6 +92,7 @@ export default function EnrichmentForm({
       return
     }
     setSaving(true)
+    setSaveError(null)
     try {
       await onSave({
         equipment,
@@ -98,6 +100,8 @@ export default function EnrichmentForm({
         transportLocation: pin,
         notes: notes.trim() ? notes.trim() : null,
       })
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Couldn't save — please try again.")
     } finally {
       setSaving(false)
     }
@@ -189,6 +193,10 @@ export default function EnrichmentForm({
             )}
           </div>
         </div>
+
+        {saveError && (
+          <p className="save-error" role="alert">{saveError}</p>
+        )}
 
         <div className="enrichment-form-footer">
           <button type="button" className="btn-ghost" onClick={onCancel} disabled={saving}>
