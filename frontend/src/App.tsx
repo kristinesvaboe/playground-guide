@@ -110,10 +110,6 @@ function App() {
 
   if (!position) return null
 
-  const selectedPlayground = playgrounds.find((pg) => pg.id === selectedId)
-  const formCentre: [number, number] = selectedPlayground
-    ? [selectedPlayground.latitude, selectedPlayground.longitude]
-    : position
   const pending = preview?.myEnrichment && !preview.myEnrichment.reviewed
 
   return (
@@ -182,7 +178,6 @@ function App() {
       {preview && formOpen && (
         <EnrichmentForm
           playgroundName={preview.name}
-          centre={formCentre}
           initial={preview.myEnrichment}
           onCancel={() => setFormOpen(false)}
           onSave={handleSave}

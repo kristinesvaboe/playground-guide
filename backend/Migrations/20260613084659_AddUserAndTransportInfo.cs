@@ -1,6 +1,5 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
-using NetTopologySuite.Geometries;
 
 #nullable disable
 
@@ -12,31 +11,11 @@ namespace PlaygroundGuide.Api.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Rename (not drop/add) preserves any existing data in the former Parking column.
+            // Rename (not drop/add) preserves any existing data in the former Parking column. Stays nullable: transport info is optional.
             migrationBuilder.RenameColumn(
                 name: "Parking",
                 table: "playground_enrichments",
                 newName: "TransportInfo");
-
-            // Backfill nulls before tightening to NOT NULL (greenfield: no rows expected, but safe regardless).
-            migrationBuilder.Sql(
-                "UPDATE playground_enrichments SET \"TransportInfo\" = '' WHERE \"TransportInfo\" IS NULL;");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "TransportInfo",
-                table: "playground_enrichments",
-                type: "text",
-                nullable: false,
-                defaultValue: "",
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: true);
-
-            migrationBuilder.AddColumn<Point>(
-                name: "TransportLocation",
-                table: "playground_enrichments",
-                type: "geometry",
-                nullable: true);
 
             migrationBuilder.AddColumn<Guid>(
                 name: "UserId",
@@ -91,21 +70,8 @@ namespace PlaygroundGuide.Api.Migrations
                 table: "playground_enrichments");
 
             migrationBuilder.DropColumn(
-                name: "TransportLocation",
-                table: "playground_enrichments");
-
-            migrationBuilder.DropColumn(
                 name: "UserId",
                 table: "playground_enrichments");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "TransportInfo",
-                table: "playground_enrichments",
-                type: "text",
-                nullable: true,
-                oldClrType: typeof(string),
-                oldType: "text",
-                oldNullable: false);
 
             migrationBuilder.RenameColumn(
                 name: "TransportInfo",

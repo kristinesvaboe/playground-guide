@@ -87,11 +87,7 @@ namespace PlaygroundGuide.Api.Migrations
                         .HasDefaultValue(false);
 
                     b.Property<string>("TransportInfo")
-                        .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<Point>("TransportLocation")
-                        .HasColumnType("geometry");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");

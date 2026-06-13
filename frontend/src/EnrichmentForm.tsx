@@ -1,18 +1,15 @@
-import { useRef, useState } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import { useState } from 'react'
 
 export type Enrichment = {
   equipment: string[]
-  transportInfo: string
-  transportLocation: { lat: number; lng: number } | null
+  transportInfo: string | null
   notes: string | null
   reviewed: boolean
 }
 
 export type EnrichmentDraft = {
   equipment: string[]
-  transportInfo: string
-  transportLocation: { lat: number; lng: number } | null
+  transportInfo: string | null
   notes: string | null
 }
 
@@ -30,40 +27,13 @@ const EQUIPMENT_OPTIONS: { value: string; label: string }[] = [
 const TRANSPORT_MAX = 200
 const NOTES_MAX = 300
 
-function PinPicker({
-  centre,
-  pin,
-  onPlace,
-}: {
-  centre: [number, number]
-  pin: { lat: number; lng: number } | null
-  onPlace: (latlng: { lat: number; lng: number }) => void
-}) {
-  function ClickHandler() {
-    useMapEvents({ click: (e) => onPlace({ lat: e.latlng.lat, lng: e.latlng.lng }) })
-    return null
-  }
-  return (
-    <MapContainer center={centre} zoom={15} className="pin-mini-map" style={{ height: '180px', width: '100%' }}>
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      />
-      <ClickHandler />
-      {pin && <Marker position={[pin.lat, pin.lng]} />}
-    </MapContainer>
-  )
-}
-
 export default function EnrichmentForm({
   playgroundName,
-  centre,
   initial,
   onCancel,
   onSave,
 }: {
   playgroundName: string | null
-  centre: [number, number]
   initial: Enrichment | null
   onCancel: () => void
   onSave: (draft: EnrichmentDraft) => Promise<void>
@@ -71,12 +41,9 @@ export default function EnrichmentForm({
   const [transportInfo, setTransportInfo] = useState(initial?.transportInfo ?? '')
   const [equipment, setEquipment] = useState<string[]>(initial?.equipment ?? [])
   const [notes, setNotes] = useState(initial?.notes ?? '')
-  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(initial?.transportLocation ?? null)
-  const [showPinMap, setShowPinMap] = useState(false)
-  const [transportError, setTransportError] = useState(false)
+  const [emptyError, setEmptyError] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const transportRef = useRef<HTMLTextAreaElement>(null)
 
   function toggleEquipment(value: string) {
     setEquipment((prev) =>
@@ -85,10 +52,8 @@ export default function EnrichmentForm({
   }
 
   async function handleSave() {
-    if (!transportInfo.trim()) {
-      setTransportError(true)
-      transportRef.current?.focus()
-      transportRef.current?.scrollIntoView({ block: 'center' })
+    if (equipment.length === 0 && !transportInfo.trim() && !notes.trim()) {
+      setEmptyError(true)
       return
     }
     setSaving(true)
@@ -96,8 +61,7 @@ export default function EnrichmentForm({
     try {
       await onSave({
         equipment,
-        transportInfo: transportInfo.trim(),
-        transportLocation: pin,
+        transportInfo: transportInfo.trim() ? transportInfo.trim() : null,
         notes: notes.trim() ? notes.trim() : null,
       })
     } catch (err) {
@@ -120,26 +84,21 @@ export default function EnrichmentForm({
 
         <div className="enrichment-form-body">
           <div className="field">
-            <label htmlFor="transport">How do you get there? (required)</label>
+            <label htmlFor="transport">How do you get there?</label>
             <p className="field-helper">
               Parking, nearest bus stop or train — anything that helps someone plan the trip.
             </p>
             <textarea
               id="transport"
-              ref={transportRef}
               value={transportInfo}
               maxLength={TRANSPORT_MAX}
-              aria-invalid={transportError}
               onChange={(e) => {
                 setTransportInfo(e.target.value)
-                if (transportError && e.target.value.trim()) setTransportError(false)
+                if (emptyError && e.target.value.trim()) setEmptyError(false)
               }}
             />
             {transportNearLimit && (
               <span className="char-counter">{transportInfo.length}/{TRANSPORT_MAX}</span>
-            )}
-            {transportError && (
-              <span className="field-error" role="alert">Please add how to get there.</span>
             )}
           </div>
 
@@ -152,7 +111,10 @@ export default function EnrichmentForm({
                   type="button"
                   className={`equipment-tag chip ${equipment.includes(opt.value) ? 'chip-selected' : ''}`}
                   aria-pressed={equipment.includes(opt.value)}
-                  onClick={() => toggleEquipment(opt.value)}
+                  onClick={() => {
+                    toggleEquipment(opt.value)
+                    if (emptyError) setEmptyError(false)
+                  }}
                 >
                   {opt.label}
                 </button>
@@ -167,31 +129,19 @@ export default function EnrichmentForm({
               value={notes}
               maxLength={NOTES_MAX}
               placeholder="Shade, fenced, toilets nearby, busy times…"
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                setNotes(e.target.value)
+                if (emptyError && e.target.value.trim()) setEmptyError(false)
+              }}
             />
             {notesNearLimit && (
               <span className="char-counter">{notes.length}/{NOTES_MAX}</span>
             )}
           </div>
 
-          <div className="field">
-            {!showPinMap && !pin && (
-              <button type="button" className="add-pin-btn" onClick={() => setShowPinMap(true)}>
-                Add a pin (optional)
-              </button>
-            )}
-            {(showPinMap || pin) && (
-              <>
-                <label>Location pin</label>
-                <PinPicker centre={pin ? [pin.lat, pin.lng] : centre} pin={pin} onPlace={setPin} />
-                {pin && (
-                  <button type="button" className="clear-pin-btn" onClick={() => setPin(null)}>
-                    Clear pin
-                  </button>
-                )}
-              </>
-            )}
-          </div>
+          {emptyError && (
+            <span className="field-error" role="alert">Add at least one detail to save.</span>
+          )}
         </div>
 
         {saveError && (

@@ -42,7 +42,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                   .HasColumnType("text[]")
                   .HasConversion(equipmentConverter, equipmentComparer);
             entity.Property(e => e.TransportInfo).HasColumnType("text");
-            entity.Property(e => e.TransportLocation).HasColumnType("geometry");
             entity.Property(e => e.Reviewed).HasDefaultValue(false);
             // RESTRICT prevents accidental enrichment data loss if an OSM re-import deletes and re-inserts playground rows
             entity.HasOne(e => e.Playground)

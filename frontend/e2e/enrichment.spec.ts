@@ -33,23 +33,22 @@ test.describe('enrichment form (chromium)', () => {
     await expect(page.locator('#transport')).toBeVisible()
   })
 
-  test('Save with empty transport info does not submit and surfaces the required hint', async ({ page }) => {
+  test('Save with all fields empty does not submit and surfaces the at-least-one-detail hint', async ({ page }) => {
     await openPreview(page)
     await page.locator('.details-btn').click()
     await expect(page.locator('.enrichment-form')).toBeVisible()
     await page.locator('.btn-primary').click()
-    // Form stays open and shows the inline required feedback
+    // Form stays open and shows the inline at-least-one-detail feedback
     await expect(page.locator('.enrichment-form')).toBeVisible()
     await expect(page.locator('.field-error')).toBeVisible()
   })
 
-  test('filling transport + equipment and saving shows the pending badge', async ({ page }) => {
+  test('saving equipment only (transport left blank) shows the pending badge', async ({ page }) => {
     await openPreview(page)
     await page.locator('.details-btn').click()
-    await page.locator('#transport').fill('Free car park next to the entrance')
     await page.locator('.equipment-tag.chip').first().click()
     await page.locator('.btn-primary').click()
-    // Form closes, card returns with the pending-review badge
+    // Transport is optional: equipment alone is enough to save
     await expect(page.locator('.enrichment-form')).not.toBeVisible()
     await expect(page.locator('.pending-badge')).toBeVisible()
   })

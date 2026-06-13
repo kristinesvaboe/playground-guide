@@ -99,7 +99,7 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
 
 app.MapPost("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentRequest body, AppDbContext db) =>
 {
-    var (error, equipment, location) = await ValidateEnrichment(id, body, db);
+    var (error, equipment) = await ValidateEnrichment(id, body, db);
     if (error is not null)
         return error;
 
@@ -113,8 +113,7 @@ app.MapPost("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReque
         PlaygroundId = id,
         UserId = body.UserId,
         Equipment = equipment!,
-        TransportInfo = body.TransportInfo!.Trim(),
-        TransportLocation = location,
+        TransportInfo = string.IsNullOrWhiteSpace(body.TransportInfo) ? null : body.TransportInfo.Trim(),
         Notes = string.IsNullOrWhiteSpace(body.Notes) ? null : body.Notes.Trim(),
         Reviewed = false,
     };
@@ -127,7 +126,7 @@ app.MapPost("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReque
 
 app.MapPut("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentRequest body, AppDbContext db) =>
 {
-    var (error, equipment, location) = await ValidateEnrichment(id, body, db);
+    var (error, equipment) = await ValidateEnrichment(id, body, db);
     if (error is not null)
         return error;
 
@@ -137,8 +136,7 @@ app.MapPut("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReques
         return Results.NotFound(new { error = "No enrichment to update for this user." });
 
     enrichment.Equipment = equipment!;
-    enrichment.TransportInfo = body.TransportInfo!.Trim();
-    enrichment.TransportLocation = location;
+    enrichment.TransportInfo = string.IsNullOrWhiteSpace(body.TransportInfo) ? null : body.TransportInfo.Trim();
     enrichment.Notes = string.IsNullOrWhiteSpace(body.Notes) ? null : body.Notes.Trim();
     // Any edit re-enters review so edited data isn't shown publicly until re-approved
     enrichment.Reviewed = false;
@@ -154,55 +152,41 @@ static object ToEnrichmentResponse(PlaygroundEnrichment e) => new
 {
     Equipment = e.Equipment.Select(eq => eq.ToString()).ToList(),
     e.TransportInfo,
-    TransportLocation = e.TransportLocation is null
-        ? null
-        : new { Lat = e.TransportLocation.Y, Lng = e.TransportLocation.X },
     e.Notes,
     e.Reviewed,
 };
 
-static async Task<(IResult? Error, List<EquipmentType>? Equipment, Point? Location)> ValidateEnrichment(
+static async Task<(IResult? Error, List<EquipmentType>? Equipment)> ValidateEnrichment(
     Guid id, EnrichmentRequest body, AppDbContext db)
 {
     if (!await db.Playgrounds.AnyAsync(p => p.Id == id))
-        return (Results.NotFound(new { error = "Playground not found." }), null, null);
+        return (Results.NotFound(new { error = "Playground not found." }), null);
 
     if (!await db.Users.AnyAsync(u => u.Id == body.UserId))
-        return (Results.BadRequest(new { error = "Unknown userId." }), null, null);
+        return (Results.BadRequest(new { error = "Unknown userId." }), null);
 
-    if (string.IsNullOrWhiteSpace(body.TransportInfo))
-        return (Results.BadRequest(new { error = "transportInfo is required." }), null, null);
-    if (body.TransportInfo.Trim().Length > 200)
-        return (Results.BadRequest(new { error = "transportInfo must be 200 characters or fewer." }), null, null);
+    if (!string.IsNullOrWhiteSpace(body.TransportInfo) && body.TransportInfo.Trim().Length > 200)
+        return (Results.BadRequest(new { error = "transportInfo must be 200 characters or fewer." }), null);
 
     if (body.Notes is not null && body.Notes.Length > 300)
-        return (Results.BadRequest(new { error = "notes must be 300 characters or fewer." }), null, null);
+        return (Results.BadRequest(new { error = "notes must be 300 characters or fewer." }), null);
 
     var equipment = new List<EquipmentType>();
     foreach (var raw in body.Equipment ?? [])
     {
         if (!Enum.TryParse<EquipmentType>(raw, out var value) || !Enum.IsDefined(value))
-            return (Results.BadRequest(new { error = $"Unknown equipment value: {raw}." }), null, null);
+            return (Results.BadRequest(new { error = $"Unknown equipment value: {raw}." }), null);
         equipment.Add(value);
     }
 
-    Point? location = null;
-    if (body.TransportLocation is not null)
-    {
-        var loc = body.TransportLocation;
-        if (loc.Lat is < -90 or > 90 || loc.Lng is < -180 or > 180)
-            return (Results.BadRequest(new { error = "transportLocation out of range." }), null, null);
-        location = new Point(loc.Lng, loc.Lat) { SRID = 4326 };
-    }
+    if (equipment.Count == 0 && string.IsNullOrWhiteSpace(body.TransportInfo) && string.IsNullOrWhiteSpace(body.Notes))
+        return (Results.BadRequest(new { error = "Add at least one detail (equipment, transport info, or notes)." }), null);
 
-    return (null, equipment, location);
+    return (null, equipment);
 }
 
 record EnrichmentRequest(
     Guid UserId,
     string[]? Equipment,
     string? TransportInfo,
-    LatLng? TransportLocation,
     string? Notes);
-
-record LatLng(double Lat, double Lng);

@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using NetTopologySuite.Geometries;
 
 namespace PlaygroundGuide.Api.Models;
 
@@ -18,9 +17,7 @@ public class PlaygroundEnrichment
 
     public List<EquipmentType> Equipment { get; set; } = [];
 
-    public string TransportInfo { get; set; } = null!;
-
-    public Point? TransportLocation { get; set; }
+    public string? TransportInfo { get; set; }
 
     public string? Notes { get; set; }
 
