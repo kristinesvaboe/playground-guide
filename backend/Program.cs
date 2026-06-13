@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using PlaygroundGuide.Api.Data;
+using PlaygroundGuide.Api.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,22 +57,152 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, AppD
     return Results.Ok(playgrounds);
 });
 
-app.MapGet("/playgrounds/{id:guid}", async (Guid id, AppDbContext db) =>
+app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext db) =>
 {
     var playground = await db.Playgrounds
         .AsNoTracking()
-        .Include(p => p.Enrichments.Where(e => e.Reviewed))
         .FirstOrDefaultAsync(p => p.Id == id);
 
     if (playground is null)
         return Results.NotFound();
 
-    // null signals "no enrichment data yet"; empty list means enrichment exists but no equipment recorded
-    var equipment = playground.Enrichments.Count == 0
-        ? null
-        : playground.Enrichments.SelectMany(e => e.Equipment).Distinct().Select(e => e.ToString()).ToList();
+    var reviewed = await db.PlaygroundEnrichments
+        .AsNoTracking()
+        .Where(e => e.PlaygroundId == id && e.Reviewed)
+        .ToListAsync();
 
-    return Results.Ok(new { playground.Id, playground.Name, Equipment = equipment });
+    // null signals "no enrichment data yet"; empty list means enrichment exists but no equipment recorded
+    var equipment = reviewed.Count == 0
+        ? null
+        : reviewed.SelectMany(e => e.Equipment).Distinct().Select(e => e.ToString()).ToList();
+
+    object? myEnrichment = null;
+    if (userId is not null && await db.Users.AnyAsync(u => u.Id == userId))
+    {
+        // Only ever the caller's own row — never another user's unreviewed data
+        var mine = await db.PlaygroundEnrichments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.PlaygroundId == id && e.UserId == userId);
+
+        if (mine is not null)
+            myEnrichment = ToEnrichmentResponse(mine);
+    }
+
+    return Results.Ok(new
+    {
+        playground.Id,
+        playground.Name,
+        Equipment = equipment,
+        MyEnrichment = myEnrichment,
+    });
+});
+
+app.MapPost("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentRequest body, AppDbContext db) =>
+{
+    var (error, equipment, location) = await ValidateEnrichment(id, body, db);
+    if (error is not null)
+        return error;
+
+    var exists = await db.PlaygroundEnrichments
+        .AnyAsync(e => e.PlaygroundId == id && e.UserId == body.UserId);
+    if (exists)
+        return Results.Conflict(new { error = "Enrichment already exists for this user; use PUT to update." });
+
+    var enrichment = new PlaygroundEnrichment
+    {
+        PlaygroundId = id,
+        UserId = body.UserId,
+        Equipment = equipment!,
+        TransportInfo = body.TransportInfo!.Trim(),
+        TransportLocation = location,
+        Notes = string.IsNullOrWhiteSpace(body.Notes) ? null : body.Notes.Trim(),
+        Reviewed = false,
+    };
+
+    db.PlaygroundEnrichments.Add(enrichment);
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/playgrounds/{id}/enrichment", ToEnrichmentResponse(enrichment));
+});
+
+app.MapPut("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentRequest body, AppDbContext db) =>
+{
+    var (error, equipment, location) = await ValidateEnrichment(id, body, db);
+    if (error is not null)
+        return error;
+
+    var enrichment = await db.PlaygroundEnrichments
+        .FirstOrDefaultAsync(e => e.PlaygroundId == id && e.UserId == body.UserId);
+    if (enrichment is null)
+        return Results.NotFound(new { error = "No enrichment to update for this user." });
+
+    enrichment.Equipment = equipment!;
+    enrichment.TransportInfo = body.TransportInfo!.Trim();
+    enrichment.TransportLocation = location;
+    enrichment.Notes = string.IsNullOrWhiteSpace(body.Notes) ? null : body.Notes.Trim();
+    // Any edit re-enters review so edited data isn't shown publicly until re-approved
+    enrichment.Reviewed = false;
+
+    await db.SaveChangesAsync();
+
+    return Results.Ok(ToEnrichmentResponse(enrichment));
 });
 
 app.Run();
+
+static object ToEnrichmentResponse(PlaygroundEnrichment e) => new
+{
+    Equipment = e.Equipment.Select(eq => eq.ToString()).ToList(),
+    e.TransportInfo,
+    TransportLocation = e.TransportLocation is null
+        ? null
+        : new { Lat = e.TransportLocation.Y, Lng = e.TransportLocation.X },
+    e.Notes,
+    e.Reviewed,
+};
+
+static async Task<(IResult? Error, List<EquipmentType>? Equipment, Point? Location)> ValidateEnrichment(
+    Guid id, EnrichmentRequest body, AppDbContext db)
+{
+    if (!await db.Playgrounds.AnyAsync(p => p.Id == id))
+        return (Results.NotFound(new { error = "Playground not found." }), null, null);
+
+    if (!await db.Users.AnyAsync(u => u.Id == body.UserId))
+        return (Results.BadRequest(new { error = "Unknown userId." }), null, null);
+
+    if (string.IsNullOrWhiteSpace(body.TransportInfo))
+        return (Results.BadRequest(new { error = "transportInfo is required." }), null, null);
+    if (body.TransportInfo.Trim().Length > 200)
+        return (Results.BadRequest(new { error = "transportInfo must be 200 characters or fewer." }), null, null);
+
+    if (body.Notes is not null && body.Notes.Length > 300)
+        return (Results.BadRequest(new { error = "notes must be 300 characters or fewer." }), null, null);
+
+    var equipment = new List<EquipmentType>();
+    foreach (var raw in body.Equipment ?? [])
+    {
+        if (!Enum.TryParse<EquipmentType>(raw, out var value) || !Enum.IsDefined(value))
+            return (Results.BadRequest(new { error = $"Unknown equipment value: {raw}." }), null, null);
+        equipment.Add(value);
+    }
+
+    Point? location = null;
+    if (body.TransportLocation is not null)
+    {
+        var loc = body.TransportLocation;
+        if (loc.Lat is < -90 or > 90 || loc.Lng is < -180 or > 180)
+            return (Results.BadRequest(new { error = "transportLocation out of range." }), null, null);
+        location = new Point(loc.Lng, loc.Lat) { SRID = 4326 };
+    }
+
+    return (null, equipment, location);
+}
+
+record EnrichmentRequest(
+    Guid UserId,
+    string[]? Equipment,
+    string? TransportInfo,
+    LatLng? TransportLocation,
+    string? Notes);
+
+record LatLng(double Lat, double Lng);
