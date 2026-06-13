@@ -70,6 +70,18 @@ cd frontend
 npm run test:e2e
 ```
 
+## Admin review
+
+Pending enrichment submissions are reviewed at `http://localhost:5173/admin/review`.
+
+The admin page reads the admin key from `VITE_ADMIN_KEY` in `frontend/.env.local` (gitignored). Create this file with:
+
+```
+VITE_ADMIN_KEY=your-admin-key
+```
+
+The key must match `AdminKey` in `backend/appsettings.Development.json`. Use a strong random value (UUID or 32+ char random string).
+
 ## API endpoints
 
 | Method | Path | Description |
@@ -79,6 +91,9 @@ npm run test:e2e
 | `GET` | `/playgrounds/{id}?userId=` | Returns a single playground with reviewed equipment tags. `equipment` is `null` if no enrichment exists yet, or an array (possibly empty) if it does. If `userId` is supplied and matches a known user with an enrichment for this playground, also returns `myEnrichment` (the caller's own data, reviewed or not); otherwise `myEnrichment` is `null`. |
 | `POST` | `/playgrounds/{id}/enrichment` | Creates the calling user's enrichment for a playground. Body: `{ userId, equipment, transportInfo, notes }`. All detail fields are optional, but at least one of `equipment`, `transportInfo`, or `notes` must be provided (400 otherwise). Server-validates `transportInfo` (≤200 chars), `notes` (≤300 chars), and known equipment values. Saved as unreviewed. 409 if the user already has one (use PUT). |
 | `PUT` | `/playgrounds/{id}/enrichment` | Updates the calling user's existing enrichment (same body/validation as POST). Any edit resets it to unreviewed so it isn't shown publicly until re-approved. 404 if none exists yet. |
+| `GET` | `/admin/enrichments` | Lists all unreviewed enrichment submissions. Protected by `X-Admin-Key` header. Response: array of `{ id, playgroundId, playgroundName, equipment, transportInfo, notes, createdAt }`. |
+| `POST` | `/admin/enrichments/{id}/approve` | Sets `reviewed = true` on the enrichment. Protected by `X-Admin-Key`. Returns 404 if not found. |
+| `DELETE` | `/admin/enrichments/{id}` | Permanently deletes the enrichment. Protected by `X-Admin-Key`. Returns 404 if not found. |
 
 ## Status
 
@@ -86,3 +101,4 @@ npm run test:e2e
 - Tapping a pin shows a preview card with the playground name and equipment tags
 - Equipment data comes from reviewed enrichments; unreviewed data is never shown
 - Users can add or edit playground details (equipment, transport info, notes — all optional, but at least one is required) via a mobile-first bottom-sheet form; submissions are held for review and only visible to their author until approved
+- Admin review page at `/admin/review` lets the app owner approve or reject pending enrichment submissions
