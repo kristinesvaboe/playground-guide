@@ -1,12 +1,11 @@
 import { useState } from 'react'
-import { EQUIPMENT_OPTIONS, AGE_OPTIONS, SIZE_OPTIONS, SURFACE_OPTIONS } from './enrichmentOptions'
+import { EQUIPMENT_OPTIONS, AGE_OPTIONS, SIZE_OPTIONS } from './enrichmentOptions'
 import './App.css'
 
 export type Enrichment = {
   equipment: string[]
   ageSuitability: string[]
   size: string | null
-  surfaceType: string[]
   otherEquipment: string | null
   transportInfo: string | null
   notes: string | null
@@ -17,7 +16,6 @@ export type EnrichmentDraft = {
   equipment: string[]
   ageSuitability: string[]
   size: string | null
-  surfaceType: string[]
   otherEquipment: string | null
   transportInfo: string | null
   notes: string | null
@@ -42,7 +40,6 @@ export default function EnrichmentForm({
   const [equipment, setEquipment] = useState<string[]>(initial?.equipment ?? [])
   const [otherEquipment, setOtherEquipment] = useState(initial?.otherEquipment ?? '')
   const [size, setSize] = useState<string | null>(initial?.size ?? null)
-  const [surfaceType, setSurfaceType] = useState<string[]>(initial?.surfaceType ?? [])
   const [transportInfo, setTransportInfo] = useState(initial?.transportInfo ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [emptyError, setEmptyError] = useState(false)
@@ -68,19 +65,11 @@ export default function EnrichmentForm({
     if (emptyError) setEmptyError(false)
   }
 
-  function toggleSurfaceType(value: string) {
-    setSurfaceType((prev) =>
-      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
-    )
-    if (emptyError) setEmptyError(false)
-  }
-
   async function handleSave() {
     if (
       equipment.length === 0 &&
       ageSuitability.length === 0 &&
       size === null &&
-      surfaceType.length === 0 &&
       !otherEquipment.trim() &&
       !transportInfo.trim() &&
       !notes.trim()
@@ -95,7 +84,6 @@ export default function EnrichmentForm({
         equipment,
         ageSuitability,
         size,
-        surfaceType,
         otherEquipment: otherEquipment.trim() ? otherEquipment.trim() : null,
         transportInfo: transportInfo.trim() ? transportInfo.trim() : null,
         notes: notes.trim() ? notes.trim() : null,
@@ -182,23 +170,6 @@ export default function EnrichmentForm({
                   aria-checked={size === opt.value}
                   className={`equipment-tag chip ${size === opt.value ? 'chip-selected' : ''}`}
                   onClick={() => toggleSize(opt.value)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="field">
-            <label>Surface type</label>
-            <div className="equipment-tags">
-              {SURFACE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={`equipment-tag chip ${surfaceType.includes(opt.value) ? 'chip-selected' : ''}`}
-                  aria-pressed={surfaceType.includes(opt.value)}
-                  onClick={() => toggleSurfaceType(opt.value)}
                 >
                   {opt.label}
                 </button>

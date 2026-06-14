@@ -84,10 +84,6 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
         ? null
         : reviewed.Select(e => e.Size?.ToString()).FirstOrDefault(s => s != null);
 
-    var surfaceType = reviewed.Count == 0
-        ? null
-        : reviewed.SelectMany(e => e.SurfaceType).Distinct().Select(e => e.ToString()).ToList();
-
     var otherEquipment = reviewed.Count == 0
         ? null
         : reviewed.Select(e => e.OtherEquipment).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s));
@@ -111,7 +107,6 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
         Equipment = equipment,
         AgeSuitability = ageSuitability,
         Size = size,
-        SurfaceType = surfaceType,
         OtherEquipment = otherEquipment,
         MyEnrichment = myEnrichment,
     });
@@ -119,7 +114,7 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
 
 app.MapPost("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentRequest body, AppDbContext db) =>
 {
-    var (error, equipment, ageSuitability, size, surfaceType) = await ValidateEnrichment(id, body, db);
+    var (error, equipment, ageSuitability, size) = await ValidateEnrichment(id, body, db);
     if (error is not null)
         return error;
 
@@ -135,7 +130,6 @@ app.MapPost("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReque
         Equipment = equipment!,
         AgeSuitability = ageSuitability!,
         Size = size,
-        SurfaceType = surfaceType!,
         OtherEquipment = string.IsNullOrWhiteSpace(body.OtherEquipment) ? null : body.OtherEquipment.Trim(),
         TransportInfo = string.IsNullOrWhiteSpace(body.TransportInfo) ? null : body.TransportInfo.Trim(),
         Notes = string.IsNullOrWhiteSpace(body.Notes) ? null : body.Notes.Trim(),
@@ -151,7 +145,7 @@ app.MapPost("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReque
 
 app.MapPut("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentRequest body, AppDbContext db) =>
 {
-    var (error, equipment, ageSuitability, size, surfaceType) = await ValidateEnrichment(id, body, db);
+    var (error, equipment, ageSuitability, size) = await ValidateEnrichment(id, body, db);
     if (error is not null)
         return error;
 
@@ -163,7 +157,6 @@ app.MapPut("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReques
     enrichment.Equipment = equipment!;
     enrichment.AgeSuitability = ageSuitability!;
     enrichment.Size = size;
-    enrichment.SurfaceType = surfaceType!;
     enrichment.OtherEquipment = string.IsNullOrWhiteSpace(body.OtherEquipment) ? null : body.OtherEquipment.Trim();
     enrichment.TransportInfo = string.IsNullOrWhiteSpace(body.TransportInfo) ? null : body.TransportInfo.Trim();
     enrichment.Notes = string.IsNullOrWhiteSpace(body.Notes) ? null : body.Notes.Trim();
@@ -195,7 +188,6 @@ app.MapGet("/admin/enrichments", async (HttpContext ctx, IConfiguration cfg, App
         Equipment = e.Equipment.Select(eq => eq.ToString()).ToList(),
         AgeSuitability = e.AgeSuitability.Select(a => a.ToString()).ToList(),
         Size = e.Size?.ToString(),
-        SurfaceType = e.SurfaceType.Select(s => s.ToString()).ToList(),
         e.OtherEquipment,
         e.TransportInfo,
         e.Notes,
@@ -240,33 +232,32 @@ static object ToEnrichmentResponse(PlaygroundEnrichment e) => new
     Equipment = e.Equipment.Select(eq => eq.ToString()).ToList(),
     AgeSuitability = e.AgeSuitability.Select(a => a.ToString()).ToList(),
     Size = e.Size?.ToString(),
-    SurfaceType = e.SurfaceType.Select(s => s.ToString()).ToList(),
     e.OtherEquipment,
     e.TransportInfo,
     e.Notes,
     e.Reviewed,
 };
 
-static async Task<(IResult? Error, List<EquipmentType>? Equipment, List<AgeSuitability>? AgeSuitability, PlaygroundSize? Size, List<SurfaceType>? SurfaceType)> ValidateEnrichment(
+static async Task<(IResult? Error, List<EquipmentType>? Equipment, List<AgeSuitability>? AgeSuitability, PlaygroundSize? Size)> ValidateEnrichment(
     Guid id, EnrichmentRequest body, AppDbContext db)
 {
     if (!await db.Playgrounds.AnyAsync(p => p.Id == id))
-        return (Results.NotFound(new { error = "Playground not found." }), null, null, null, null);
+        return (Results.NotFound(new { error = "Playground not found." }), null, null, null);
 
     if (!await db.Users.AnyAsync(u => u.Id == body.UserId))
-        return (Results.BadRequest(new { error = "Unknown userId." }), null, null, null, null);
+        return (Results.BadRequest(new { error = "Unknown userId." }), null, null, null);
 
     if (!string.IsNullOrWhiteSpace(body.TransportInfo) && body.TransportInfo.Trim().Length > 200)
-        return (Results.BadRequest(new { error = "transportInfo must be 200 characters or fewer." }), null, null, null, null);
+        return (Results.BadRequest(new { error = "transportInfo must be 200 characters or fewer." }), null, null, null);
 
     if (!string.IsNullOrWhiteSpace(body.Notes) && body.Notes.Trim().Length > 300)
-        return (Results.BadRequest(new { error = "notes must be 300 characters or fewer." }), null, null, null, null);
+        return (Results.BadRequest(new { error = "notes must be 300 characters or fewer." }), null, null, null);
 
     var equipment = new List<EquipmentType>();
     foreach (var raw in body.Equipment ?? [])
     {
         if (!Enum.TryParse<EquipmentType>(raw, out var value) || !Enum.IsDefined(value))
-            return (Results.BadRequest(new { error = $"Unknown equipment value: {raw}." }), null, null, null, null);
+            return (Results.BadRequest(new { error = $"Unknown equipment value: {raw}." }), null, null, null);
         equipment.Add(value);
     }
 
@@ -274,7 +265,7 @@ static async Task<(IResult? Error, List<EquipmentType>? Equipment, List<AgeSuita
     foreach (var raw in body.AgeSuitability ?? [])
     {
         if (!Enum.TryParse<AgeSuitability>(raw, out var value) || !Enum.IsDefined(value))
-            return (Results.BadRequest(new { error = $"Unknown age suitability value: {raw}." }), null, null, null, null);
+            return (Results.BadRequest(new { error = $"Unknown age suitability value: {raw}." }), null, null, null);
         ageSuitability.Add(value);
     }
 
@@ -282,31 +273,22 @@ static async Task<(IResult? Error, List<EquipmentType>? Equipment, List<AgeSuita
     if (!string.IsNullOrEmpty(body.Size))
     {
         if (!Enum.TryParse<PlaygroundSize>(body.Size, out var parsedSize) || !Enum.IsDefined(parsedSize))
-            return (Results.BadRequest(new { error = $"Unknown size value: {body.Size}." }), null, null, null, null);
+            return (Results.BadRequest(new { error = $"Unknown size value: {body.Size}." }), null, null, null);
         size = parsedSize;
     }
 
-    var surfaceType = new List<SurfaceType>();
-    foreach (var raw in body.SurfaceType ?? [])
-    {
-        if (!Enum.TryParse<SurfaceType>(raw, out var value) || !Enum.IsDefined(value))
-            return (Results.BadRequest(new { error = $"Unknown surface type value: {raw}." }), null, null, null, null);
-        surfaceType.Add(value);
-    }
-
     if (!string.IsNullOrWhiteSpace(body.OtherEquipment) && body.OtherEquipment.Trim().Length > 200)
-        return (Results.BadRequest(new { error = "otherEquipment must be 200 characters or fewer." }), null, null, null, null);
+        return (Results.BadRequest(new { error = "otherEquipment must be 200 characters or fewer." }), null, null, null);
 
     if (equipment.Count == 0
         && ageSuitability.Count == 0
         && size is null
-        && surfaceType.Count == 0
         && string.IsNullOrWhiteSpace(body.OtherEquipment)
         && string.IsNullOrWhiteSpace(body.TransportInfo)
         && string.IsNullOrWhiteSpace(body.Notes))
-        return (Results.BadRequest(new { error = "Please add at least one detail before saving." }), null, null, null, null);
+        return (Results.BadRequest(new { error = "Please add at least one detail before saving." }), null, null, null);
 
-    return (null, equipment, ageSuitability, size, surfaceType);
+    return (null, equipment, ageSuitability, size);
 }
 
 static bool AdminKeyValid(HttpContext ctx, IConfiguration cfg)
@@ -322,7 +304,6 @@ record EnrichmentRequest(
     string[]? Equipment,
     string[]? AgeSuitability,
     string? Size,
-    string[]? SurfaceType,
     string? OtherEquipment,
     string? TransportInfo,
     string? Notes);

@@ -21,8 +21,6 @@ public class PlaygroundEnrichment
 
     public PlaygroundSize? Size { get; set; }
 
-    public List<SurfaceType> SurfaceType { get; set; } = [];
-
     public string? OtherEquipment { get; set; }
 
     public string? TransportInfo { get; set; }

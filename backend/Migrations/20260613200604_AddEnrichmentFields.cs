@@ -23,13 +23,6 @@ namespace PlaygroundGuide.Api.Migrations
                 type: "text",
                 nullable: true);
 
-            migrationBuilder.AddColumn<string[]>(
-                name: "SurfaceType",
-                table: "playground_enrichments",
-                type: "text[]",
-                nullable: false,
-                defaultValueSql: "'{}'");
-
             migrationBuilder.AddColumn<string>(
                 name: "OtherEquipment",
                 table: "playground_enrichments",
@@ -47,10 +40,6 @@ namespace PlaygroundGuide.Api.Migrations
 
             migrationBuilder.DropColumn(
                 name: "Size",
-                table: "playground_enrichments");
-
-            migrationBuilder.DropColumn(
-                name: "SurfaceType",
                 table: "playground_enrichments");
 
             migrationBuilder.DropColumn(

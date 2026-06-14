@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import './AdminReview.css'
-import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS, SURFACE_LABELS } from './enrichmentOptions'
+import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5100'
 const ADMIN_KEY = (import.meta.env.VITE_ADMIN_KEY as string | undefined) ?? ''
@@ -12,7 +12,6 @@ type Submission = {
   equipment: string[]
   ageSuitability: string[]
   size: string | null
-  surfaceType: string[]
   otherEquipment: string | null
   transportInfo: string | null
   notes: string | null
@@ -96,14 +95,6 @@ function SubmissionCard({
         <p className="card-field">
           <span className="field-label">Size:</span> {SIZE_LABELS[submission.size] ?? submission.size}
         </p>
-      )}
-
-      {submission.surfaceType.length > 0 && (
-        <div className="admin-equipment-tags">
-          {submission.surfaceType.map((s) => (
-            <span key={s} className="admin-equipment-tag">{SURFACE_LABELS[s] ?? s}</span>
-          ))}
-        </div>
       )}
 
       {submission.otherEquipment && (

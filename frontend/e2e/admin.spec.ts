@@ -7,7 +7,6 @@ const MOCK_SUBMISSION = {
   equipment: ['Swing', 'Slide'],
   ageSuitability: ['Toddlers'],
   size: 'Medium',
-  surfaceType: ['Rubber'],
   otherEquipment: null,
   transportInfo: 'Bus 11 from city centre',
   notes: null,

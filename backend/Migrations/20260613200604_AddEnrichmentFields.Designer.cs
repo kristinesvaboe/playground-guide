@@ -103,10 +103,6 @@ namespace PlaygroundGuide.Api.Migrations
                     b.Property<string>("Size")
                         .HasColumnType("text");
 
-                    b.Property<string[]>("SurfaceType")
-                        .IsRequired()
-                        .HasColumnType("text[]");
-
                     b.Property<string>("TransportInfo")
                         .HasColumnType("text");
 

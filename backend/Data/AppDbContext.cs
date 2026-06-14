@@ -64,21 +64,6 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                       v => v == null ? (PlaygroundSize?)null : Enum.Parse<PlaygroundSize>(v)
                   ));
 
-            var surfaceTypeConverter = new ValueConverter<List<SurfaceType>, string[]>(
-                v => v.Select(e => e.ToString()).ToArray(),
-                v => v.Where(s => Enum.IsDefined(typeof(SurfaceType), s))
-                      .Select(s => Enum.Parse<SurfaceType>(s))
-                      .ToList()
-            );
-            var surfaceTypeComparer = new ValueComparer<List<SurfaceType>>(
-                (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
-                v => v.Aggregate(0, (h, e) => HashCode.Combine(h, e.GetHashCode())),
-                v => v.ToList()
-            );
-            entity.Property(e => e.SurfaceType)
-                  .HasColumnType("text[]")
-                  .HasConversion(surfaceTypeConverter, surfaceTypeComparer);
-
             entity.Property(e => e.OtherEquipment).HasMaxLength(200);
 
             entity.Property(e => e.TransportInfo).HasColumnType("text");
