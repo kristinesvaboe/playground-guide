@@ -41,6 +41,33 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(e => e.Equipment)
                   .HasColumnType("text[]")
                   .HasConversion(equipmentConverter, equipmentComparer);
+
+            var ageSuitabilityConverter = new ValueConverter<List<AgeSuitability>, string[]>(
+                v => v.Select(e => e.ToString()).ToArray(),
+                v => v.Where(s => Enum.IsDefined(typeof(AgeSuitability), s))
+                      .Select(s => Enum.Parse<AgeSuitability>(s))
+                      .ToList()
+            );
+            var ageSuitabilityComparer = new ValueComparer<List<AgeSuitability>>(
+                (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
+                v => v.Aggregate(0, (h, e) => HashCode.Combine(h, e.GetHashCode())),
+                v => v.ToList()
+            );
+            entity.Property(e => e.AgeSuitability)
+                  .HasColumnType("text[]")
+                  .HasConversion(ageSuitabilityConverter, ageSuitabilityComparer);
+
+            entity.Property(e => e.Size)
+                  .HasColumnType("text")
+                  .HasConversion(new ValueConverter<PlaygroundSize?, string?>(
+                      v => v.HasValue ? v.Value.ToString() : null,
+                      v => v != null && Enum.IsDefined(typeof(PlaygroundSize), v)
+                          ? Enum.Parse<PlaygroundSize>(v)
+                          : (PlaygroundSize?)null
+                  ));
+
+            entity.Property(e => e.OtherEquipment).HasMaxLength(200);
+
             entity.Property(e => e.TransportInfo).HasColumnType("text");
             entity.Property(e => e.Reviewed).HasDefaultValue(false);
             // RESTRICT prevents accidental enrichment data loss if an OSM re-import deletes and re-inserts playground rows

@@ -1,7 +1,12 @@
 import { useState } from 'react'
+import { EQUIPMENT_OPTIONS, AGE_OPTIONS, SIZE_OPTIONS } from './enrichmentOptions'
+import './App.css'
 
 export type Enrichment = {
   equipment: string[]
+  ageSuitability: string[]
+  size: string | null
+  otherEquipment: string | null
   transportInfo: string | null
   notes: string | null
   reviewed: boolean
@@ -9,23 +14,16 @@ export type Enrichment = {
 
 export type EnrichmentDraft = {
   equipment: string[]
+  ageSuitability: string[]
+  size: string | null
+  otherEquipment: string | null
   transportInfo: string | null
   notes: string | null
 }
 
-// Enum values sent to the API paired with the human-facing label
-const EQUIPMENT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'Swing', label: 'Swing' },
-  { value: 'Trampoline', label: 'Trampoline' },
-  { value: 'Slide', label: 'Slide' },
-  { value: 'ClimbingFrame', label: 'Climbing frame' },
-  { value: 'Sandpit', label: 'Sandpit' },
-  { value: 'Springy', label: 'Springy rider' },
-  { value: 'Roundabout', label: 'Roundabout' },
-]
-
 const TRANSPORT_MAX = 200
 const NOTES_MAX = 300
+const OTHER_EQUIPMENT_MAX = 200
 
 export default function EnrichmentForm({
   playgroundName,
@@ -38,8 +36,11 @@ export default function EnrichmentForm({
   onCancel: () => void
   onSave: (draft: EnrichmentDraft) => Promise<void>
 }) {
-  const [transportInfo, setTransportInfo] = useState(initial?.transportInfo ?? '')
+  const [ageSuitability, setAgeSuitability] = useState<string[]>(initial?.ageSuitability ?? [])
   const [equipment, setEquipment] = useState<string[]>(initial?.equipment ?? [])
+  const [otherEquipment, setOtherEquipment] = useState(initial?.otherEquipment ?? '')
+  const [size, setSize] = useState<string | null>(initial?.size ?? null)
+  const [transportInfo, setTransportInfo] = useState(initial?.transportInfo ?? '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [emptyError, setEmptyError] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -49,10 +50,30 @@ export default function EnrichmentForm({
     setEquipment((prev) =>
       prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
     )
+    if (emptyError) setEmptyError(false)
+  }
+
+  function toggleAgeSuitability(value: string) {
+    setAgeSuitability((prev) =>
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+    )
+    if (emptyError) setEmptyError(false)
+  }
+
+  function toggleSize(value: string) {
+    setSize((prev) => (prev === value ? null : value))
+    if (emptyError) setEmptyError(false)
   }
 
   async function handleSave() {
-    if (equipment.length === 0 && !transportInfo.trim() && !notes.trim()) {
+    if (
+      equipment.length === 0 &&
+      ageSuitability.length === 0 &&
+      size === null &&
+      !otherEquipment.trim() &&
+      !transportInfo.trim() &&
+      !notes.trim()
+    ) {
       setEmptyError(true)
       return
     }
@@ -61,6 +82,9 @@ export default function EnrichmentForm({
     try {
       await onSave({
         equipment,
+        ageSuitability,
+        size,
+        otherEquipment: otherEquipment.trim() ? otherEquipment.trim() : null,
         transportInfo: transportInfo.trim() ? transportInfo.trim() : null,
         notes: notes.trim() ? notes.trim() : null,
       })
@@ -84,6 +108,78 @@ export default function EnrichmentForm({
 
         <div className="enrichment-form-body">
           <div className="field">
+            <label>Age suitability</label>
+            <div className="equipment-tags">
+              {AGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`equipment-tag chip ${ageSuitability.includes(opt.value) ? 'chip-selected' : ''}`}
+                  aria-pressed={ageSuitability.includes(opt.value)}
+                  onClick={() => toggleAgeSuitability(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Equipment</label>
+            <div className="equipment-tags">
+              {EQUIPMENT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`equipment-tag chip ${equipment.includes(opt.value) ? 'chip-selected' : ''}`}
+                  aria-pressed={equipment.includes(opt.value)}
+                  onClick={() => toggleEquipment(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="otherEquipment">Other equipment</label>
+            <p className="field-helper">Anything not in the list — zip wire, water play, etc.</p>
+            <textarea
+              id="otherEquipment"
+              value={otherEquipment}
+              maxLength={OTHER_EQUIPMENT_MAX}
+              placeholder="e.g. zip wire, water play…"
+              onChange={(e) => {
+                setOtherEquipment(e.target.value)
+                if (emptyError && e.target.value.trim()) setEmptyError(false)
+              }}
+            />
+            {otherEquipment.length >= OTHER_EQUIPMENT_MAX * 0.8 && (
+              <span className="char-counter">{otherEquipment.length}/{OTHER_EQUIPMENT_MAX}</span>
+            )}
+          </div>
+
+          <div className="field">
+            <label>Size</label>
+            <div className="equipment-tags" role="radiogroup" aria-label="Playground size">
+              {SIZE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={size === opt.value}
+                  className={`equipment-tag chip ${size === opt.value ? 'chip-selected' : ''}`}
+                  onClick={() => toggleSize(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <hr className="form-divider" />
+
+          <div className="field">
             <label htmlFor="transport">How do you get there?</label>
             <p className="field-helper">
               Parking, nearest bus stop or train — anything that helps someone plan the trip.
@@ -100,26 +196,6 @@ export default function EnrichmentForm({
             {transportNearLimit && (
               <span className="char-counter">{transportInfo.length}/{TRANSPORT_MAX}</span>
             )}
-          </div>
-
-          <div className="field">
-            <label>Equipment</label>
-            <div className="equipment-tags">
-              {EQUIPMENT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  className={`equipment-tag chip ${equipment.includes(opt.value) ? 'chip-selected' : ''}`}
-                  aria-pressed={equipment.includes(opt.value)}
-                  onClick={() => {
-                    toggleEquipment(opt.value)
-                    if (emptyError) setEmptyError(false)
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="field">
@@ -140,7 +216,7 @@ export default function EnrichmentForm({
           </div>
 
           {emptyError && (
-            <span className="field-error" role="alert">Add at least one detail to save.</span>
+            <span className="field-error" role="alert">Please add at least one detail before saving.</span>
           )}
         </div>
 

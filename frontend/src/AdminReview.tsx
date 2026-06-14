@@ -1,24 +1,18 @@
 import { useEffect, useState } from 'react'
 import './AdminReview.css'
+import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5100'
 const ADMIN_KEY = (import.meta.env.VITE_ADMIN_KEY as string | undefined) ?? ''
-
-const EQUIPMENT_LABELS: Record<string, string> = {
-  Swing: 'Swing',
-  Trampoline: 'Trampoline',
-  Slide: 'Slide',
-  ClimbingFrame: 'Climbing frame',
-  Sandpit: 'Sandpit',
-  Springy: 'Springy rider',
-  Roundabout: 'Roundabout',
-}
 
 type Submission = {
   id: string
   playgroundId: string
   playgroundName: string | null
   equipment: string[]
+  ageSuitability: string[]
+  size: string | null
+  otherEquipment: string | null
   transportInfo: string | null
   notes: string | null
   createdAt: string
@@ -87,6 +81,26 @@ function SubmissionCard({
             <span key={eq} className="admin-equipment-tag">{EQUIPMENT_LABELS[eq] ?? eq}</span>
           ))}
         </div>
+      )}
+
+      {submission.ageSuitability.length > 0 && (
+        <div className="admin-equipment-tags">
+          {submission.ageSuitability.map((a) => (
+            <span key={a} className="admin-equipment-tag">{AGE_LABELS[a] ?? a}</span>
+          ))}
+        </div>
+      )}
+
+      {submission.size && (
+        <p className="card-field">
+          <span className="field-label">Size:</span> {SIZE_LABELS[submission.size] ?? submission.size}
+        </p>
+      )}
+
+      {submission.otherEquipment && (
+        <p className="card-field">
+          <span className="field-label">Other equipment:</span> {submission.otherEquipment}
+        </p>
       )}
 
       {submission.transportInfo && (

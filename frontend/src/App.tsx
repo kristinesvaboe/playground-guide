@@ -7,6 +7,7 @@ import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 import EnrichmentForm, { type Enrichment, type EnrichmentDraft } from './EnrichmentForm'
+import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
 
 // Leaflet's _getIconUrl prototype method ignores mergeOptions; delete it so the options are used instead
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -17,16 +18,6 @@ const STAVANGER: [number, number] = [58.9700, 5.7331]
 
 // Placeholder identity until authentication exists; matches AppDbContext.SeedUserId
 const CURRENT_USER_ID = 'a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d'
-
-const EQUIPMENT_LABELS: Record<string, string> = {
-  Swing: 'Swing',
-  Trampoline: 'Trampoline',
-  Slide: 'Slide',
-  ClimbingFrame: 'Climbing frame',
-  Sandpit: 'Sandpit',
-  Springy: 'Springy rider',
-  Roundabout: 'Roundabout',
-}
 
 type Playground = {
   id: string
@@ -39,6 +30,8 @@ type PlaygroundPreview = {
   id: string
   name: string | null
   equipment: string[] | null
+  ageSuitability: string[] | null
+  size: string | null
   myEnrichment: Enrichment | null
 }
 
@@ -149,6 +142,16 @@ function App() {
                   <span key={eq} className="equipment-tag">{EQUIPMENT_LABELS[eq] ?? eq}</span>
                 ))}
               </div>
+              {preview.myEnrichment!.ageSuitability.length > 0 && (
+                <div className="equipment-tags">
+                  {preview.myEnrichment!.ageSuitability.map((a) => (
+                    <span key={a} className="equipment-tag">{AGE_LABELS[a] ?? a}</span>
+                  ))}
+                </div>
+              )}
+              {preview.myEnrichment!.size && (
+                <span className="size-pill">{SIZE_LABELS[preview.myEnrichment!.size] ?? preview.myEnrichment!.size}</span>
+              )}
               {preview.myEnrichment!.notes && (
                 <p className="pending-notes">{preview.myEnrichment!.notes}</p>
               )}
@@ -167,6 +170,16 @@ function App() {
                 <span key={eq} className="equipment-tag">{EQUIPMENT_LABELS[eq] ?? eq}</span>
               ))}
             </div>
+          )}
+          {!pending && preview.ageSuitability !== null && preview.ageSuitability.length > 0 && (
+            <div className="equipment-tags">
+              {preview.ageSuitability.map((a) => (
+                <span key={a} className="equipment-tag">{AGE_LABELS[a] ?? a}</span>
+              ))}
+            </div>
+          )}
+          {!pending && preview.size && (
+            <span className="size-pill">{SIZE_LABELS[preview.size] ?? preview.size}</span>
           )}
 
           <button className="details-btn" onClick={() => setFormOpen(true)}>

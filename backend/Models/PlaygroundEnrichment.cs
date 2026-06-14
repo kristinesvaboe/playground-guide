@@ -17,6 +17,12 @@ public class PlaygroundEnrichment
 
     public List<EquipmentType> Equipment { get; set; } = [];
 
+    public List<AgeSuitability> AgeSuitability { get; set; } = [];
+
+    public PlaygroundSize? Size { get; set; }
+
+    public string? OtherEquipment { get; set; }
+
     public string? TransportInfo { get; set; }
 
     public string? Notes { get; set; }
