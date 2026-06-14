@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -8,16 +9,13 @@ import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 import EnrichmentForm, { type Enrichment, type EnrichmentDraft } from './EnrichmentForm'
 import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
+import { API_URL, CURRENT_USER_ID } from './config'
 
 // Leaflet's _getIconUrl prototype method ignores mergeOptions; delete it so the options are used instead
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl })
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5100'
 const STAVANGER: [number, number] = [58.9700, 5.7331]
-
-// Placeholder identity until authentication exists; matches AppDbContext.SeedUserId
-const CURRENT_USER_ID = 'a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d'
 
 type Playground = {
   id: string
@@ -41,6 +39,9 @@ function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
 }
 
 function App() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const focusId = searchParams.get('focus')
   const [position, setPosition] = useState<[number, number] | null>(null)
   const [playgrounds, setPlaygrounds] = useState<Playground[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -54,6 +55,19 @@ function App() {
   }
 
   useEffect(() => {
+    // Returning from the detail page: centre on that playground and re-open its preview
+    if (focusId) {
+      fetch(`${API_URL}/playgrounds/${focusId}?userId=${CURRENT_USER_ID}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((pg) => {
+          if (!pg) return
+          setPosition([pg.latitude, pg.longitude])
+          setSelectedId(focusId)
+        })
+        .catch(() => {})
+      return
+    }
+
     if (!navigator.geolocation) {
       setPosition(STAVANGER)
       return
@@ -62,7 +76,7 @@ function App() {
       (pos) => setPosition([pos.coords.latitude, pos.coords.longitude]),
       () => setPosition(STAVANGER)
     )
-  }, [])
+  }, [focusId])
 
   useEffect(() => {
     if (!position) return
@@ -182,6 +196,12 @@ function App() {
             <span className="size-pill">{SIZE_LABELS[preview.size] ?? preview.size}</span>
           )}
 
+          <button
+            className="view-details-btn"
+            onClick={() => navigate(`/playground/${preview.id}`)}
+          >
+            View details
+          </button>
           <button className="details-btn" onClick={() => setFormOpen(true)}>
             {preview.myEnrichment ? 'Edit details' : 'Add details'}
           </button>

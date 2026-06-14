@@ -88,6 +88,14 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
         ? null
         : reviewed.Select(e => e.OtherEquipment).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s));
 
+    var transportInfo = reviewed.Count == 0
+        ? null
+        : reviewed.Select(e => e.TransportInfo).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s));
+
+    var notes = reviewed.Count == 0
+        ? null
+        : reviewed.Select(e => e.Notes).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s));
+
     object? myEnrichment = null;
     if (userId is not null)
     {
@@ -104,10 +112,14 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
     {
         playground.Id,
         playground.Name,
+        playground.Latitude,
+        playground.Longitude,
         Equipment = equipment,
         AgeSuitability = ageSuitability,
         Size = size,
         OtherEquipment = otherEquipment,
+        TransportInfo = transportInfo,
+        Notes = notes,
         MyEnrichment = myEnrichment,
     });
 });
