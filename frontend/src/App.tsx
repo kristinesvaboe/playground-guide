@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -33,8 +33,21 @@ type PlaygroundPreview = {
   myEnrichment: Enrichment | null
 }
 
-function MapClickHandler({ onMapClick }: { onMapClick: () => void }) {
-  useMapEvents({ click: onMapClick })
+function MapEvents({
+  onMapClick,
+  onMoveEnd,
+}: {
+  onMapClick: () => void
+  onMoveEnd: (lat: number, lng: number, radius: number) => void
+}) {
+  const map = useMapEvents({
+    click: onMapClick,
+    moveend: () => {
+      const center = map.getCenter()
+      const radius = Math.round(map.distance(center, map.getBounds().getNorthEast()))
+      onMoveEnd(center.lat, center.lng, radius)
+    },
+  })
   return null
 }
 
@@ -47,11 +60,36 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [preview, setPreview] = useState<PlaygroundPreview | null>(null)
 
+  const moveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   function loadPreview(id: string) {
     return fetch(`${API_URL}/playgrounds/${id}?userId=${CURRENT_USER_ID}`)
       .then((res) => res.json())
       .then(setPreview)
   }
+
+  const loadPlaygrounds = useCallback((lat: number, lng: number, radius: number) => {
+    fetch(`${API_URL}/playgrounds?lat=${lat}&lng=${lng}&radius=${radius}`)
+      .then((res) => res.json())
+      .then(setPlaygrounds)
+      .catch(() => {})
+  }, [])
+
+  const handleMoveEnd = useCallback(
+    (lat: number, lng: number, radius: number) => {
+      // Panning away is a "show me elsewhere" gesture: drop the open preview so it
+      // can't keep pointing at a marker that's about to leave the result set.
+      setSelectedId(null)
+      if (moveTimeout.current) clearTimeout(moveTimeout.current)
+      moveTimeout.current = setTimeout(() => loadPlaygrounds(lat, lng, radius), 350)
+    },
+    [loadPlaygrounds]
+  )
+
+  // Drop any pending debounced fetch if the map unmounts mid-interaction
+  useEffect(() => () => {
+    if (moveTimeout.current) clearTimeout(moveTimeout.current)
+  }, [])
 
   useEffect(() => {
     // Returning from the detail page: centre on that playground and re-open its preview
@@ -79,12 +117,8 @@ function App() {
 
   useEffect(() => {
     if (!position) return
-    const [lat, lng] = position
-    fetch(`${API_URL}/playgrounds?lat=${lat}&lng=${lng}&radius=5000`)
-      .then((res) => res.json())
-      .then(setPlaygrounds)
-      .catch(() => {})
-  }, [position])
+    loadPlaygrounds(position[0], position[1], 5000)
+  }, [position, loadPlaygrounds])
 
   useEffect(() => {
     if (!selectedId) {
@@ -105,7 +139,7 @@ function App() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
-        <MapClickHandler onMapClick={() => setSelectedId(null)} />
+        <MapEvents onMapClick={() => setSelectedId(null)} onMoveEnd={handleMoveEnd} />
         {playgrounds.map((pg) => (
           <Marker
             key={pg.id}

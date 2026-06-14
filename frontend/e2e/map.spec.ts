@@ -65,6 +65,45 @@ test.describe('map interactions', () => {
   })
 })
 
+// Re-fetch on pan/zoom. Skipped on mobile-390 because the smaller viewport makes the
+// drag distance unreliable for moving the map centre meaningfully.
+test.describe('re-fetch on map move', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile-390', 'drag distance unreliable at 390px')
+  })
+
+  test('panning the map re-fetches playgrounds centred on the new location', async ({ page }) => {
+    // Collect list-fetch latitudes from before navigation so the mount-time fetch is
+    // never missed (registering the listener after goto() races the initial request).
+    const lats: string[] = []
+    page.on('request', (req) => {
+      const url = new URL(req.url())
+      if (url.pathname === '/playgrounds' && url.searchParams.has('lat')) {
+        lats.push(url.searchParams.get('lat')!)
+      }
+    })
+
+    await page.goto('/')
+    await expect(page.locator('.leaflet-container')).toBeVisible()
+    await expect.poll(() => lats.length).toBeGreaterThanOrEqual(1)
+    const initialLat = lats[0]
+
+    const map = page.locator('.leaflet-container')
+    const box = await map.boundingBox()
+    if (!box) throw new Error('map not visible')
+    const cx = box.x + box.width / 2
+    const cy = box.y + box.height / 2
+
+    await page.mouse.move(cx, cy)
+    await page.mouse.down()
+    await page.mouse.move(cx, cy - 200, { steps: 10 })
+    await page.mouse.up()
+
+    // The pan fires a debounced re-fetch centred on the new latitude.
+    await expect.poll(() => lats[lats.length - 1], { timeout: 5000 }).not.toBe(initialLat)
+  })
+})
+
 // Layout tests: only meaningful at the 390px viewport the mobile-390 project provides.
 test.describe('390px layout', () => {
   test.beforeEach(({}, testInfo) => {
