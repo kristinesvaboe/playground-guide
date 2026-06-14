@@ -70,6 +70,8 @@ cd frontend
 npm run test:e2e
 ```
 
+The suite runs as a dedicated E2E user (created on setup, cleaned up on teardown), so it never reads or deletes the data you add manually through the app.
+
 ## Admin review
 
 Pending enrichment submissions are reviewed at `http://localhost:5173/admin/review`.
