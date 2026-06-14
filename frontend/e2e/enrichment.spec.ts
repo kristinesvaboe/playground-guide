@@ -17,6 +17,9 @@ async function openPreview(page: import('@playwright/test').Page) {
 }
 
 test.describe('enrichment form (chromium)', () => {
+  // Serial mode: tests write to the same DB row; running in parallel causes 409 conflicts.
+  test.describe.configure({ mode: 'serial' })
+
   test.beforeEach(({}, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'interaction tested on chromium')
   })
@@ -40,13 +43,28 @@ test.describe('enrichment form (chromium)', () => {
     await page.locator('.btn-primary').click()
     // Form stays open and shows the inline at-least-one-detail feedback
     await expect(page.locator('.enrichment-form')).toBeVisible()
-    await expect(page.locator('.field-error')).toBeVisible()
+    await expect(page.locator('.field-error')).toContainText('Please add at least one detail before saving.')
+  })
+
+  test('selecting age suitability saves and shows in pending badge section', async ({ page }) => {
+    await openPreview(page)
+    await page.locator('.details-btn').click()
+    await expect(page.locator('.enrichment-form')).toBeVisible()
+    // Click both chips: if either was pre-selected (leftover DB state), toggling it off still
+    // leaves the other newly selected, so the at-least-one-detail guard always passes.
+    await page.getByRole('button', { name: 'Toddlers' }).click()
+    await page.getByRole('button', { name: 'Swing' }).click()
+    await page.locator('.btn-primary').click()
+    await expect(page.locator('.pending-badge')).toBeVisible({ timeout: 5000 })
   })
 
   test('saving equipment only (transport left blank) shows the pending badge', async ({ page }) => {
     await openPreview(page)
     await page.locator('.details-btn').click()
-    await page.locator('.equipment-tag.chip').first().click()
+    // Click two chips so if one was pre-selected (from the age-suitability test above),
+    // toggling it off still leaves the other newly selected.
+    await page.getByRole('button', { name: 'Swing' }).click()
+    await page.getByRole('button', { name: 'Slide' }).click()
     await page.locator('.btn-primary').click()
     // Transport is optional: equipment alone is enough to save
     await expect(page.locator('.enrichment-form')).not.toBeVisible()
