@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { useTestUser } from './test-user'
 
 // Requires the full local stack: Docker (Postgres/PostGIS) + backend on :5100 +
 // frontend dev server on :5173. Exercises navigation from the map preview card
@@ -7,6 +8,10 @@ import { test, expect } from '@playwright/test'
 test.use({
   geolocation: { latitude: 58.97, longitude: 5.7331 },
   permissions: ['geolocation'],
+})
+
+test.beforeEach(async ({ page }) => {
+  await useTestUser(page)
 })
 
 async function openPreview(page: import('@playwright/test').Page) {

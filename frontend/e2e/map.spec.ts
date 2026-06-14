@@ -1,8 +1,13 @@
 import { test, expect } from '@playwright/test'
+import { useTestUser } from './test-user'
 
 test.use({
   geolocation: { latitude: 58.97, longitude: 5.7331 },
   permissions: ['geolocation'],
+})
+
+test.beforeEach(async ({ page }) => {
+  await useTestUser(page)
 })
 
 test('map renders', async ({ page }) => {
