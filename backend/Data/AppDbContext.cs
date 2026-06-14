@@ -61,7 +61,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                   .HasColumnType("text")
                   .HasConversion(new ValueConverter<PlaygroundSize?, string?>(
                       v => v.HasValue ? v.Value.ToString() : null,
-                      v => v == null ? (PlaygroundSize?)null : Enum.Parse<PlaygroundSize>(v)
+                      v => v != null && Enum.IsDefined(typeof(PlaygroundSize), v)
+                          ? Enum.Parse<PlaygroundSize>(v)
+                          : (PlaygroundSize?)null
                   ));
 
             entity.Property(e => e.OtherEquipment).HasMaxLength(200);
