@@ -7,7 +7,7 @@ import './App.css'
 import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
-import EnrichmentForm, { type Enrichment, type EnrichmentDraft } from './EnrichmentForm'
+import { type Enrichment } from './EnrichmentForm'
 import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
 import { API_URL, CURRENT_USER_ID } from './config'
 
@@ -46,7 +46,6 @@ function App() {
   const [playgrounds, setPlaygrounds] = useState<Playground[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [preview, setPreview] = useState<PlaygroundPreview | null>(null)
-  const [formOpen, setFormOpen] = useState(false)
 
   function loadPreview(id: string) {
     return fetch(`${API_URL}/playgrounds/${id}?userId=${CURRENT_USER_ID}`)
@@ -90,30 +89,10 @@ function App() {
   useEffect(() => {
     if (!selectedId) {
       setPreview(null)
-      setFormOpen(false)
       return
     }
     loadPreview(selectedId).catch(() => {})
   }, [selectedId])
-
-  async function handleSave(draft: EnrichmentDraft) {
-    if (!selectedId) return
-    const method = preview?.myEnrichment ? 'PUT' : 'POST'
-    const res = await fetch(`${API_URL}/playgrounds/${selectedId}/enrichment`, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: CURRENT_USER_ID, ...draft }),
-    })
-    if (!res.ok) {
-      const message = await res
-        .json()
-        .then((body) => body?.error as string | undefined)
-        .catch(() => undefined)
-      throw new Error(message ?? "Couldn't save — please try again.")
-    }
-    await loadPreview(selectedId).catch(() => {})
-    setFormOpen(false)
-  }
 
   if (!position) return null
 
@@ -135,7 +114,7 @@ function App() {
           />
         ))}
       </MapContainer>
-      {preview && !formOpen && (
+      {preview && (
         <div className="preview-card">
           <div className="preview-card-header">
             <h2>{preview.name ?? 'Playground'}</h2>
@@ -202,19 +181,7 @@ function App() {
           >
             View details
           </button>
-          <button className="details-btn" onClick={() => setFormOpen(true)}>
-            {preview.myEnrichment ? 'Edit details' : 'Add details'}
-          </button>
         </div>
-      )}
-
-      {preview && formOpen && (
-        <EnrichmentForm
-          playgroundName={preview.name}
-          initial={preview.myEnrichment}
-          onCancel={() => setFormOpen(false)}
-          onSave={handleSave}
-        />
       )}
     </>
   )
