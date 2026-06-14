@@ -88,7 +88,7 @@ The key must match `AdminKey` in `backend/appsettings.Development.json`. Use a s
 |--------|------|-------------|
 | `GET` | `/health` | Returns `{ "status": "ok" }` |
 | `GET` | `/playgrounds?lat=&lng=&radius=` | Returns playgrounds within `radius` metres of the given coordinates. All three params required. Response: `[{ id, name, latitude, longitude }]`. |
-| `GET` | `/playgrounds/{id}?userId=` | Returns a single playground with reviewed enrichment data. `equipment`, `ageSuitability`, `size`, and `otherEquipment` are `null` if no reviewed enrichment exists yet. If `userId` is supplied and matches a known user with an enrichment for this playground, also returns `myEnrichment` (the caller's own data, reviewed or not); otherwise `myEnrichment` is `null`. |
+| `GET` | `/playgrounds/{id}?userId=` | Returns a single playground (including `latitude`, `longitude`) with reviewed enrichment data. `equipment`, `ageSuitability`, `size`, `otherEquipment`, `transportInfo`, and `notes` are `null` if no reviewed enrichment exists yet. If `userId` is supplied and matches a known user with an enrichment for this playground, also returns `myEnrichment` (the caller's own data, reviewed or not); otherwise `myEnrichment` is `null`. |
 | `POST` | `/playgrounds/{id}/enrichment` | Creates the calling user's enrichment for a playground. Body: `{ userId, equipment, ageSuitability, size, otherEquipment, transportInfo, notes }`. All detail fields are optional, but at least one must be provided (400 otherwise). Server-validates enum values, `transportInfo` (≤200 chars), `notes` (≤300 chars), and `otherEquipment` (≤200 chars). Saved as unreviewed. 409 if the user already has one (use PUT). |
 | `PUT` | `/playgrounds/{id}/enrichment` | Updates the calling user's existing enrichment (same body/validation as POST). Any edit resets it to unreviewed so it isn't shown publicly until re-approved. 404 if none exists yet. |
 | `GET` | `/admin/enrichments` | Lists all unreviewed enrichment submissions. Protected by `X-Admin-Key` header. Response: array of `{ id, playgroundId, playgroundName, equipment, ageSuitability, size, otherEquipment, transportInfo, notes, createdAt }`. |
@@ -99,6 +99,7 @@ The key must match `AdminKey` in `backend/appsettings.Development.json`. Use a s
 
 - Map view shows playgrounds near your current location using OpenStreetMap data
 - Tapping a pin shows a preview card with the playground name and equipment tags
+- "View details" on the preview card opens a full detail page (`/playground/:id`) showing equipment, age suitability, size, other equipment, transport info, notes, and a small static map of the location; "Back to map" returns to the map re-centred on that playground
 - Equipment data comes from reviewed enrichments; unreviewed data is never shown
 - Users can add or edit playground details (age suitability, equipment, other equipment, size, transport info, notes — all optional, but at least one is required) via a mobile-first bottom-sheet form; submissions are held for review and only visible to their author until approved
 - Admin review page at `/admin/review` lets the app owner approve or reject pending enrichment submissions

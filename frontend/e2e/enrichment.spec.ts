@@ -16,6 +16,16 @@ async function openPreview(page: import('@playwright/test').Page) {
   await expect(page.locator('.preview-card')).toBeVisible()
 }
 
+// The Add/Edit details button lives on the detail page: open the preview, go to
+// details, then open the enrichment form from there.
+async function openForm(page: import('@playwright/test').Page) {
+  await openPreview(page)
+  await page.getByRole('button', { name: 'View details' }).dispatchEvent('click')
+  await expect(page.locator('.detail-page')).toBeVisible()
+  await page.locator('.detail-edit-btn').dispatchEvent('click')
+  await expect(page.locator('.enrichment-form')).toBeVisible()
+}
+
 test.describe('enrichment form (chromium)', () => {
   // Serial mode: tests write to the same DB row; running in parallel causes 409 conflicts.
   test.describe.configure({ mode: 'serial' })
@@ -24,22 +34,20 @@ test.describe('enrichment form (chromium)', () => {
     test.skip(testInfo.project.name === 'mobile-390', 'interaction tested on chromium')
   })
 
-  test('preview card offers an Add/Edit details button', async ({ page }) => {
+  test('the Add/Edit details button lives on the detail page, not the preview card', async ({ page }) => {
     await openPreview(page)
-    await expect(page.locator('.details-btn')).toHaveText(/Add details|Edit details/)
+    await expect(page.locator('.preview-card .details-btn')).toHaveCount(0)
+    await page.getByRole('button', { name: 'View details' }).dispatchEvent('click')
+    await expect(page.locator('.detail-edit-btn')).toHaveText(/Add details|Edit details/)
   })
 
   test('tapping the details button opens the form', async ({ page }) => {
-    await openPreview(page)
-    await page.locator('.details-btn').click()
-    await expect(page.locator('.enrichment-form')).toBeVisible()
+    await openForm(page)
     await expect(page.locator('#transport')).toBeVisible()
   })
 
   test('Save with all fields empty does not submit and surfaces the at-least-one-detail hint', async ({ page }) => {
-    await openPreview(page)
-    await page.locator('.details-btn').click()
-    await expect(page.locator('.enrichment-form')).toBeVisible()
+    await openForm(page)
     await page.locator('.btn-primary').click()
     // Form stays open and shows the inline at-least-one-detail feedback
     await expect(page.locator('.enrichment-form')).toBeVisible()
@@ -47,9 +55,7 @@ test.describe('enrichment form (chromium)', () => {
   })
 
   test('selecting age suitability saves and shows in pending badge section', async ({ page }) => {
-    await openPreview(page)
-    await page.locator('.details-btn').click()
-    await expect(page.locator('.enrichment-form')).toBeVisible()
+    await openForm(page)
     // Click both chips: if either was pre-selected (leftover DB state), toggling it off still
     // leaves the other newly selected, so the at-least-one-detail guard always passes.
     await page.getByRole('button', { name: 'Toddlers' }).click()
@@ -59,8 +65,7 @@ test.describe('enrichment form (chromium)', () => {
   })
 
   test('saving equipment only (transport left blank) shows the pending badge', async ({ page }) => {
-    await openPreview(page)
-    await page.locator('.details-btn').click()
+    await openForm(page)
     // Click two chips so if one was pre-selected (from the age-suitability test above),
     // toggling it off still leaves the other newly selected.
     await page.getByRole('button', { name: 'Swing' }).click()
@@ -76,8 +81,7 @@ test.describe('enrichment form (chromium)', () => {
     await page.route('**/enrichment', (route) =>
       route.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
     )
-    await openPreview(page)
-    await page.locator('.details-btn').click()
+    await openForm(page)
     await page.locator('#transport').fill('Free car park next to the entrance')
     await page.locator('.btn-primary').click()
     await expect(page.locator('.save-error')).toBeVisible()
@@ -91,8 +95,7 @@ test.describe('enrichment form 390px layout', () => {
   })
 
   test('form and footer fit within the 390px viewport', async ({ page }) => {
-    await openPreview(page)
-    await page.locator('.details-btn').dispatchEvent('click')
+    await openForm(page)
     await expect(page.locator('.enrichment-form')).toBeInViewport()
     await expect(page.locator('.enrichment-form-footer')).toBeInViewport()
   })
