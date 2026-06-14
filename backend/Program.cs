@@ -24,6 +24,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddHttpClient<OsmImportService>(client =>
 {
     client.BaseAddress = new Uri("https://overpass-api.de/api/");
+    // Overpass rejects requests without a User-Agent with 406; its usage policy also asks for an identifying one.
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "playground-guide/1.0 (+https://github.com/kristinesvaboe/playground-guide)");
 });
 
 var app = builder.Build();

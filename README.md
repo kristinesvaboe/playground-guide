@@ -50,7 +50,7 @@ Returns:
 { "created": 42, "updated": 7 }
 ```
 
-**Setup:** Set `AdminKey` in `appsettings.Development.json` (or via environment variable `AdminKey`) to a secret value of your choice. The placeholder value `"change-me"` in `appsettings.json` must be overridden before use.
+**Setup:** No admin key ships in source control. Set `AdminKey` in `appsettings.Development.json` (gitignored) or via the `AdminKey` environment variable to a secret value of your choice. Until it is set, the endpoint returns `503` (fail-closed).
 
 ```json
 {

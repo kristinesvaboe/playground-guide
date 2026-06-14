@@ -16,7 +16,8 @@ public class OsmImportService(HttpClient httpClient, ILogger<OsmImportService> l
 
     public async Task<(int created, int updated)> ImportRogalandAsync(AppDbContext db)
     {
-        // Overpass requires the query unencoded in the body — percent-encoding causes 406.
+        // Overpass accepts the query as a form-encoded "data" field; the 406 it returns on
+        // failure is caused by a missing User-Agent (set on the HttpClient), not by encoding.
         var content = new ByteArrayContent(Encoding.UTF8.GetBytes($"data={OverpassQuery}"));
         content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded");
 
