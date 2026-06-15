@@ -22,8 +22,8 @@ const STAVANGER: [number, number] = [58.9700, 5.7331]
 const favouriteIcon = L.divIcon({
   className: 'favourite-pin',
   html: '<span aria-hidden="true">♥</span>',
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
+  iconSize: [40, 40],
+  iconAnchor: [20, 38],
 })
 
 // Pass an explicit default for non-favourite pins: icon={undefined} would override

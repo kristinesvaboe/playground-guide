@@ -86,7 +86,7 @@ test.describe('favourites (chromium)', () => {
 
     await page.locator('.favourites-toggle-btn').click()
     await expect(page.locator('.favourites-panel')).toBeVisible()
-    await expect(page.locator('.muted')).toHaveText('No favourites yet')
+    await expect(page.locator('.favourites-panel .muted')).toHaveText('No favourites yet')
   })
 })
 
