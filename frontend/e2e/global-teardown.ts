@@ -3,8 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { TEST_USER_ID } from './test-user'
 
-// The write tests persist playground_enrichments, user_favourites, user_saved, and
-// playground_flags rows for the dedicated E2E user. Without cleanup they survive the
+// The write tests persist playground_enrichments, user_favourites, user_saved,
+// playground_flags, and user_hidden_playgrounds rows for the dedicated E2E user. Without cleanup they survive the
 // run, so repeat runs become order-dependent (the form opens in "Edit" mode, or a
 // heart/bookmark is already filled). The flag test also flips a real playground's
 // IsHidden to true — left uncleaned, every run permanently hides another playground.
@@ -27,7 +27,7 @@ export default function globalTeardown() {
         '-d',
         'playgroundguide',
         '-c',
-        `UPDATE playgrounds SET "IsHidden" = false WHERE "Id" IN (SELECT "PlaygroundId" FROM playground_flags WHERE "UserId" = '${TEST_USER_ID}'); DELETE FROM playground_flags WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM playground_enrichments WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_favourites WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_saved WHERE "UserId" = '${TEST_USER_ID}';`,
+        `UPDATE playgrounds SET "IsHidden" = false WHERE "Id" IN (SELECT "PlaygroundId" FROM playground_flags WHERE "UserId" = '${TEST_USER_ID}'); DELETE FROM playground_flags WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM playground_enrichments WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_favourites WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_saved WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_hidden_playgrounds WHERE "UserId" = '${TEST_USER_ID}';`,
       ],
       { cwd: repoRoot, stdio: 'pipe' }
     )
