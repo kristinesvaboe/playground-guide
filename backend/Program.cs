@@ -237,6 +237,74 @@ app.MapDelete("/admin/enrichments/{id:guid}", async (Guid id, HttpContext ctx, I
     return Results.NoContent();
 });
 
+app.MapPost("/playgrounds/{id:guid}/favourite", async (Guid id, FavouriteRequest body, AppDbContext db) =>
+{
+    if (!await db.Playgrounds.AnyAsync(p => p.Id == id))
+        return Results.NotFound(new { error = "Playground not found." });
+
+    if (!await db.Users.AnyAsync(u => u.Id == body.UserId))
+        return Results.BadRequest(new { error = "Unknown userId." });
+
+    var exists = await db.UserFavourites.AnyAsync(f => f.PlaygroundId == id && f.UserId == body.UserId);
+    if (!exists)
+    {
+        db.UserFavourites.Add(new UserFavourite
+        {
+            PlaygroundId = id,
+            UserId = body.UserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+        });
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Concurrent double-tap raced past the existence check; the composite PK
+            // already prevents a duplicate, so treat it as the favourite being set.
+        }
+    }
+
+    return Results.NoContent();
+});
+
+app.MapDelete("/playgrounds/{id:guid}/favourite", async (Guid id, Guid? userId, AppDbContext db) =>
+{
+    if (userId is null)
+        return Results.BadRequest(new { error = "userId is required." });
+
+    var favourite = await db.UserFavourites
+        .FirstOrDefaultAsync(f => f.PlaygroundId == id && f.UserId == userId);
+    if (favourite is not null)
+    {
+        db.UserFavourites.Remove(favourite);
+        await db.SaveChangesAsync();
+    }
+
+    return Results.NoContent();
+});
+
+app.MapGet("/favourites", async (Guid? userId, AppDbContext db) =>
+{
+    if (userId is null)
+        return Results.BadRequest(new { error = "userId is required." });
+
+    var favourites = await db.UserFavourites
+        .AsNoTracking()
+        .Where(f => f.UserId == userId)
+        .OrderByDescending(f => f.CreatedAt)
+        .Select(f => new
+        {
+            f.Playground.Id,
+            f.Playground.Name,
+            f.Playground.Latitude,
+            f.Playground.Longitude,
+        })
+        .ToListAsync();
+
+    return Results.Ok(favourites);
+});
+
 app.Run();
 
 static object ToEnrichmentResponse(PlaygroundEnrichment e) => new
@@ -319,3 +387,5 @@ record EnrichmentRequest(
     string? OtherEquipment,
     string? TransportInfo,
     string? Notes);
+
+record FavouriteRequest(Guid UserId);

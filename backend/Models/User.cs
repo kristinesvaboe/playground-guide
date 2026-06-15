@@ -10,4 +10,6 @@ public class User
     public string Name { get; set; } = null!;
 
     public ICollection<PlaygroundEnrichment> Enrichments { get; set; } = [];
+
+    public ICollection<UserFavourite> Favourites { get; set; } = [];
 }

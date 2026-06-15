@@ -10,12 +10,25 @@ import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 import { type Enrichment } from './EnrichmentForm'
 import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
 import { API_URL, CURRENT_USER_ID } from './config'
+import FavouritesList, { type Favourite } from './FavouritesList'
 
 // Leaflet's _getIconUrl prototype method ignores mergeOptions; delete it so the options are used instead
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl })
 
 const STAVANGER: [number, number] = [58.9700, 5.7331]
+
+// Heart badge marker for favourited pins; legible at 390px and stays clickable
+const favouriteIcon = L.divIcon({
+  className: 'favourite-pin',
+  html: '<span aria-hidden="true">♥</span>',
+  iconSize: [40, 40],
+  iconAnchor: [20, 38],
+})
+
+// Pass an explicit default for non-favourite pins: icon={undefined} would override
+// Leaflet's built-in default with undefined and crash on createIcon()
+const defaultIcon = new L.Icon.Default()
 
 type Playground = {
   id: string
@@ -59,8 +72,31 @@ function App() {
   const [playgrounds, setPlaygrounds] = useState<Playground[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [preview, setPreview] = useState<PlaygroundPreview | null>(null)
+  const [favourites, setFavourites] = useState<Favourite[]>([])
+  const [favouritesOpen, setFavouritesOpen] = useState(false)
 
   const moveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const favouriteIds = new Set(favourites.map((f) => f.id))
+
+  const loadFavourites = useCallback(() => {
+    return fetch(`${API_URL}/favourites?userId=${CURRENT_USER_ID}`)
+      .then((res) => res.json())
+      .then(setFavourites)
+      .catch(() => {})
+  }, [])
+
+  function toggleFavourite(id: string) {
+    const isFavourite = favouriteIds.has(id)
+    const request = isFavourite
+      ? fetch(`${API_URL}/playgrounds/${id}/favourite?userId=${CURRENT_USER_ID}`, { method: 'DELETE' })
+      : fetch(`${API_URL}/playgrounds/${id}/favourite`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: CURRENT_USER_ID }),
+        })
+    return request.then(() => loadFavourites()).catch(() => {})
+  }
 
   function loadPreview(id: string) {
     return fetch(`${API_URL}/playgrounds/${id}?userId=${CURRENT_USER_ID}`)
@@ -121,6 +157,10 @@ function App() {
   }, [position, loadPlaygrounds])
 
   useEffect(() => {
+    loadFavourites()
+  }, [loadFavourites])
+
+  useEffect(() => {
     if (!selectedId) {
       setPreview(null)
       return
@@ -144,14 +184,38 @@ function App() {
           <Marker
             key={pg.id}
             position={[pg.latitude, pg.longitude]}
+            icon={favouriteIds.has(pg.id) ? favouriteIcon : defaultIcon}
             eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); setSelectedId(pg.id) } }}
           />
         ))}
       </MapContainer>
+
+      <button
+        className="favourites-toggle-btn"
+        onClick={() => setFavouritesOpen(true)}
+      >
+        <span aria-hidden="true">♥</span> Favourites
+      </button>
+
+      {favouritesOpen && (
+        <FavouritesList
+          favourites={favourites}
+          position={position}
+          onClose={() => setFavouritesOpen(false)}
+        />
+      )}
       {preview && (
         <div className="preview-card">
           <div className="preview-card-header">
             <h2>{preview.name ?? 'Playground'}</h2>
+            <button
+              onClick={() => toggleFavourite(preview.id)}
+              aria-label={favouriteIds.has(preview.id) ? 'Remove from favourites' : 'Add to favourites'}
+              aria-pressed={favouriteIds.has(preview.id)}
+              className="favourite-toggle-btn"
+            >
+              {favouriteIds.has(preview.id) ? '♥' : '♡'}
+            </button>
             <button
               onClick={() => setSelectedId(null)}
               aria-label="Close"

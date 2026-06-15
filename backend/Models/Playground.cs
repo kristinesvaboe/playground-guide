@@ -25,4 +25,6 @@ public class Playground
     public PlaygroundSource Source { get; set; }
 
     public ICollection<PlaygroundEnrichment> Enrichments { get; set; } = [];
+
+    public ICollection<UserFavourite> Favourites { get; set; } = [];
 }

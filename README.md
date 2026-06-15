@@ -96,6 +96,9 @@ The key must match `AdminKey` in `backend/appsettings.Development.json`. Use a s
 | `GET` | `/admin/enrichments` | Lists all unreviewed enrichment submissions. Protected by `X-Admin-Key` header. Response: array of `{ id, playgroundId, playgroundName, equipment, ageSuitability, size, otherEquipment, transportInfo, notes, createdAt }`. |
 | `POST` | `/admin/enrichments/{id}/approve` | Sets `reviewed = true` on the enrichment. Protected by `X-Admin-Key`. Returns 404 if not found. |
 | `DELETE` | `/admin/enrichments/{id}` | Permanently deletes the enrichment. Protected by `X-Admin-Key`. Returns 404 if not found. |
+| `POST` | `/playgrounds/{id}/favourite` | Marks the playground as a favourite for the calling user. Body: `{ userId }`. Idempotent (no duplicate if already favourited). Returns 204. 404 if the playground is unknown, 400 if the userId is unknown. |
+| `DELETE` | `/playgrounds/{id}/favourite?userId=` | Removes the favourite for the calling user. Idempotent (204 even if it wasn't favourited). |
+| `GET` | `/favourites?userId=` | Returns the user's favourited playgrounds, newest first. Response: `[{ id, name, latitude, longitude }]`. Distance from the user is computed client-side; no user location is stored. |
 
 ## Status
 
@@ -105,3 +108,4 @@ The key must match `AdminKey` in `backend/appsettings.Development.json`. Use a s
 - Equipment data comes from reviewed enrichments; unreviewed data is never shown
 - Users can add or edit playground details (age suitability, equipment, other equipment, size, transport info, notes — all optional, but at least one is required) via a mobile-first bottom-sheet form; submissions are held for review and only visible to their author until approved
 - Admin review page at `/admin/review` lets the app owner approve or reject pending enrichment submissions
+- Users can favourite a playground from the preview card; favourited playgrounds show a heart on their map pin and appear in a Favourites list (opened from a button on the map) showing each playground's name and distance from the current location
