@@ -71,6 +71,19 @@ export default function PlaygroundDetail() {
     setFormOpen(false)
   }
 
+  function hideFromMyView() {
+    if (!id) return
+    // Return to the map (no focus) so it reloads without the now-hidden playground;
+    // a failed request self-corrects since the playground stays visible.
+    fetch(`${API_URL}/playgrounds/${id}/hide`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: CURRENT_USER_ID }),
+    })
+      .catch(() => {})
+      .finally(() => navigate('/'))
+  }
+
   if (status === 'loading') {
     return <div className="detail-page"><p className="detail-loading">Loading…</p></div>
   }
@@ -177,6 +190,10 @@ export default function PlaygroundDetail() {
 
         <button className="detail-edit-btn" onClick={() => setFormOpen(true)}>
           {detail.myEnrichment ? 'Edit details' : 'Add details'}
+        </button>
+
+        <button className="hide-mine-btn" onClick={hideFromMyView}>
+          Hide from my map
         </button>
       </div>
 

@@ -148,17 +148,6 @@ function App() {
       .catch(() => window.alert("Couldn't hide this playground — please try again."))
   }
 
-  function hideFromMyView(id: string) {
-    // Optimistic: a failed request self-corrects since the pin reappears on the next load
-    fetch(`${API_URL}/playgrounds/${id}/hide`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: CURRENT_USER_ID }),
-    }).catch(() => {})
-    setPlaygrounds((prev) => prev.filter((pg) => pg.id !== id))
-    setSelectedId(null)
-  }
-
   function loadPreview(id: string) {
     return fetch(`${API_URL}/playgrounds/${id}?userId=${CURRENT_USER_ID}`)
       .then((res) => res.json())
@@ -379,13 +368,6 @@ function App() {
             onClick={() => navigate(`/playground/${preview.id}`)}
           >
             View details
-          </button>
-
-          <button
-            className="hide-mine-btn"
-            onClick={() => hideFromMyView(preview.id)}
-          >
-            Hide from my map
           </button>
 
           <button
