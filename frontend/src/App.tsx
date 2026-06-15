@@ -155,7 +155,7 @@ function App() {
   }
 
   const loadPlaygrounds = useCallback((lat: number, lng: number, radius: number) => {
-    fetch(`${API_URL}/playgrounds?lat=${lat}&lng=${lng}&radius=${radius}`)
+    fetch(`${API_URL}/playgrounds?lat=${lat}&lng=${lng}&radius=${radius}&userId=${CURRENT_USER_ID}`)
       .then((res) => res.json())
       .then(setPlaygrounds)
       .catch(() => {})

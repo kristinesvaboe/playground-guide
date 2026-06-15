@@ -13,6 +13,14 @@ const MOCK_SUBMISSION = {
   createdAt: '2026-06-10T12:00:00Z',
 }
 
+// The admin page also loads the hidden-playgrounds section (#23), whose cards reuse
+// the .submission-card class. Mock that endpoint empty so these tests aren't disturbed
+// by global hides flag.spec may create concurrently (which would make .submission-card
+// match more than one element).
+test.beforeEach(async ({ page }) => {
+  await page.route('**/admin/hidden-playgrounds', (route) => route.fulfill({ json: [] }))
+})
+
 test.describe('admin review page', () => {
   test.beforeEach(({}, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'interaction tests run on chromium only')

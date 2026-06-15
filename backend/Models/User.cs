@@ -16,4 +16,6 @@ public class User
     public ICollection<UserSaved> Saved { get; set; } = [];
 
     public ICollection<PlaygroundFlag> Flags { get; set; } = [];
+
+    public ICollection<UserHiddenPlayground> Hidden { get; set; } = [];
 }

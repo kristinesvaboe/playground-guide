@@ -33,4 +33,6 @@ public class Playground
     public ICollection<UserSaved> Saved { get; set; } = [];
 
     public ICollection<PlaygroundFlag> Flags { get; set; } = [];
+
+    public ICollection<UserHiddenPlayground> HiddenByUsers { get; set; } = [];
 }
