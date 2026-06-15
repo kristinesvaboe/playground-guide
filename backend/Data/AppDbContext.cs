@@ -10,6 +10,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Playground> Playgrounds => Set<Playground>();
     public DbSet<PlaygroundEnrichment> PlaygroundEnrichments => Set<PlaygroundEnrichment>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<UserFavourite> UserFavourites => Set<UserFavourite>();
 
     // Stable, hard-coded seed user. Shared with the Implementation agent and frontend.
     public static readonly Guid SeedUserId = new("a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d");
@@ -87,6 +88,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             entity.ToTable("users");
             entity.HasData(new User { Id = SeedUserId, Name = "Kristine" });
+        });
+
+        modelBuilder.Entity<UserFavourite>(entity =>
+        {
+            entity.ToTable("user_favourites");
+            entity.HasKey(f => new { f.UserId, f.PlaygroundId });
+            // RESTRICT protects favourites: an OSM re-import or user deletion must not silently cascade-delete them
+            entity.HasOne(f => f.Playground)
+                  .WithMany(p => p.Favourites)
+                  .HasForeignKey(f => f.PlaygroundId)
+                  .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(f => f.User)
+                  .WithMany(u => u.Favourites)
+                  .HasForeignKey(f => f.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
