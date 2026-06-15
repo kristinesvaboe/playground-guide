@@ -33,26 +33,31 @@ test.describe('flag no longer exists (chromium)', () => {
     test.skip(testInfo.project.name === 'mobile-390', 'markers may be outside 390px viewport')
   })
 
-  test('cancelling the confirm does not flag the playground', async ({ page }) => {
-    page.on('dialog', (d) => d.dismiss())
+  test('cancelling the reason dialog does not flag the playground', async ({ page }) => {
     await openThirdPreview(page)
     await page.locator('.flag-gone-btn').click()
-    // Dismissed: the preview stays open and the marker is still present.
+    await expect(page.locator('.flag-reason-dialog')).toBeVisible()
+    await page.locator('.flag-reason-dialog .btn-ghost').click()
+    // Cancelled: the dialog closes, the preview stays open and the marker is still present.
+    await expect(page.locator('.flag-reason-dialog')).not.toBeVisible()
     await expect(page.locator('.preview-card')).toBeVisible()
     await expect(page.locator('.leaflet-marker-icon').nth(2)).toBeVisible()
   })
 
-  test('confirming flags the playground and hides it from the map', async ({ page }) => {
+  test('choosing a reason flags the playground and hides it from the map', async ({ page }) => {
     await openThirdPreview(page)
     const before = await page.locator('.leaflet-marker-icon').count()
 
-    page.on('dialog', (d) => d.accept())
+    await page.locator('.flag-gone-btn').click()
+    await expect(page.locator('.flag-reason-dialog')).toBeVisible()
+    await page.locator('.flag-reason-chip').first().click()
     const [response] = await Promise.all([
       page.waitForResponse((r) => r.url().includes('/flag') && r.request().method() === 'POST'),
-      page.locator('.flag-gone-btn').click(),
+      page.locator('.flag-reason-submit').click(),
     ])
     expect(response.ok()).toBeTruthy()
 
+    await expect(page.locator('.flag-reason-dialog')).not.toBeVisible()
     await expect(page.locator('.preview-card')).not.toBeVisible()
     await expect(page.locator('.leaflet-marker-icon')).toHaveCount(before - 1)
 
@@ -70,10 +75,14 @@ test.describe('flag button 390px layout', () => {
     test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
   })
 
-  test('the flag button fits within the 390px viewport when the preview is open', async ({ page }) => {
+  test('the flag button and reason dialog fit within the 390px viewport', async ({ page }) => {
     await page.goto('/')
     await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible({ timeout: 10000 })
     await page.locator('.leaflet-marker-icon').first().dispatchEvent('click')
     await expect(page.locator('.flag-gone-btn')).toBeInViewport()
+
+    await page.locator('.flag-gone-btn').click()
+    await expect(page.locator('.flag-reason-dialog')).toBeVisible()
+    await expect(page.locator('.flag-reason-submit')).toBeInViewport()
   })
 })

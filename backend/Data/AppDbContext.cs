@@ -133,6 +133,17 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                       v => v.ToString(),
                       v => Enum.IsDefined(typeof(FlagType), v) ? Enum.Parse<FlagType>(v) : default
                   ));
+            entity.Property(f => f.Reason)
+                  .HasColumnType("text")
+                  .HasConversion(new ValueConverter<FlagReason, string>(
+                      v => v.ToString(),
+                      v => Enum.IsDefined(typeof(FlagReason), v) ? Enum.Parse<FlagReason>(v) : default
+                  ))
+                  // Non-nullable: backfill any pre-existing #23 flag rows with "Other" so the column adds without a NOT NULL violation
+                  .HasDefaultValue(FlagReason.Other)
+                  // Sentinel is an out-of-range value EF never persists, so an explicit PermanentlyClosed (CLR default 0) is still written rather than swapped for the DB default
+                  .HasSentinel((FlagReason)(-1));
+            entity.Property(f => f.ReasonNote).HasMaxLength(200);
             // RESTRICT protects flags: an OSM re-import or user deletion must not silently cascade-delete them
             entity.HasOne(f => f.Playground)
                   .WithMany(p => p.Flags)

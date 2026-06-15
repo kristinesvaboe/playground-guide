@@ -418,6 +418,16 @@ app.MapPost("/playgrounds/{id:guid}/flag", async (Guid id, FlagRequest body, App
     if (!Enum.TryParse<FlagType>(body.FlagType, out var flagType) || !Enum.IsDefined(flagType))
         return Results.BadRequest(new { error = $"Unknown flagType value: {body.FlagType}." });
 
+    if (!Enum.TryParse<FlagReason>(body.Reason, out var reason) || !Enum.IsDefined(reason))
+        return Results.BadRequest(new { error = $"Unknown reason value: {body.Reason}." });
+
+    if (!string.IsNullOrWhiteSpace(body.ReasonNote) && body.ReasonNote.Trim().Length > 200)
+        return Results.BadRequest(new { error = "reasonNote must be 200 characters or fewer." });
+
+    var reasonNote = reason == FlagReason.Other && !string.IsNullOrWhiteSpace(body.ReasonNote)
+        ? body.ReasonNote.Trim()
+        : null;
+
     if (await db.PlaygroundFlags.AnyAsync(f => f.PlaygroundId == id && f.UserId == body.UserId))
         return Results.Conflict(new { error = "You have already flagged this playground." });
 
@@ -426,6 +436,8 @@ app.MapPost("/playgrounds/{id:guid}/flag", async (Guid id, FlagRequest body, App
         PlaygroundId = id,
         UserId = body.UserId,
         FlagType = flagType,
+        Reason = reason,
+        ReasonNote = reasonNote,
         CreatedAt = DateTimeOffset.UtcNow,
     });
     playground.IsHidden = true;
@@ -480,6 +492,8 @@ app.MapGet("/admin/hidden-playgrounds", async (HttpContext ctx, IConfiguration c
             f.Playground.Longitude,
             f.UserId,
             UserName = f.User.Name,
+            Reason = f.Reason.ToString(),
+            f.ReasonNote,
             f.CreatedAt,
         })
         .ToListAsync();
@@ -574,6 +588,6 @@ record FavouriteRequest(Guid UserId);
 
 record SavedRequest(Guid UserId);
 
-record FlagRequest(Guid UserId, string FlagType);
+record FlagRequest(Guid UserId, string FlagType, string Reason, string? ReasonNote);
 
 record HideRequest(Guid UserId);
