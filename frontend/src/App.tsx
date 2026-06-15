@@ -8,6 +8,7 @@ import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 import { type Enrichment } from './EnrichmentForm'
+import FlagReasonDialog from './FlagReasonDialog'
 import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
 import { API_URL, CURRENT_USER_ID } from './config'
 import PlaceListPanel, { type Place } from './PlaceListPanel'
@@ -84,6 +85,7 @@ function App() {
   const [favouritesOpen, setFavouritesOpen] = useState(false)
   const [saved, setSaved] = useState<Place[]>([])
   const [savedOpen, setSavedOpen] = useState(false)
+  const [flaggingId, setFlaggingId] = useState<string | null>(null)
 
   const moveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -128,24 +130,21 @@ function App() {
     return request.then(() => loadSaved()).catch(() => {})
   }
 
-  function flagNoLongerExists(id: string) {
-    if (!window.confirm('This hides the playground from the map for everyone. Only do this if it has really gone.')) return
-    fetch(`${API_URL}/playgrounds/${id}/flag`, {
+  async function submitFlag(id: string, reason: string, reasonNote: string | null) {
+    const res = await fetch(`${API_URL}/playgrounds/${id}/flag`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: CURRENT_USER_ID, flagType: 'NoLongerExists' }),
+      body: JSON.stringify({ userId: CURRENT_USER_ID, flagType: 'NoLongerExists', reason, reasonNote }),
     })
-      .then((res) => {
-        // 409 means it was already flagged/hidden — either way it should disappear locally
-        if (res.ok || res.status === 409) {
-          setPlaygrounds((prev) => prev.filter((pg) => pg.id !== id))
-          setSelectedId(null)
-          return
-        }
-        // Don't let a failed hide masquerade as success (the pin would wrongly vanish)
-        window.alert("Couldn't hide this playground — please try again.")
-      })
-      .catch(() => window.alert("Couldn't hide this playground — please try again."))
+    // 409 means it was already flagged/hidden — either way it should disappear locally
+    if (res.ok || res.status === 409) {
+      setPlaygrounds((prev) => prev.filter((pg) => pg.id !== id))
+      setSelectedId(null)
+      setFlaggingId(null)
+      return
+    }
+    // Throw so the dialog keeps itself open and shows its error rather than vanishing the pin
+    throw new Error('flag failed')
   }
 
   function loadPreview(id: string) {
@@ -372,11 +371,18 @@ function App() {
 
           <button
             className="flag-gone-btn"
-            onClick={() => flagNoLongerExists(preview.id)}
+            onClick={() => setFlaggingId(preview.id)}
           >
             This playground no longer exists
           </button>
         </div>
+      )}
+
+      {flaggingId && (
+        <FlagReasonDialog
+          onCancel={() => setFlaggingId(null)}
+          onSubmit={(reason, reasonNote) => submitFlag(flaggingId, reason, reasonNote)}
+        />
       )}
     </>
   )

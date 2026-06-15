@@ -88,6 +88,32 @@ test.describe('admin review page', () => {
     await page.goto('/admin/review')
     await expect(page.getByText('No pending submissions.')).toBeVisible()
   })
+
+  test('hidden playground card shows the flag reason and note', async ({ page }) => {
+    await page.route('**/admin/enrichments', (route) => route.fulfill({ json: [] }))
+    // Override the empty hidden mock from the outer beforeEach
+    await page.route('**/admin/hidden-playgrounds', (route) =>
+      route.fulfill({
+        json: [
+          {
+            id: '99999999-8888-7777-6666-555555555555',
+            name: 'Gone Leikeplass',
+            latitude: 58.97,
+            longitude: 5.7331,
+            userId: 'a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d',
+            userName: 'Kristine',
+            reason: 'Other',
+            reasonNote: 'Replaced by a car park',
+            createdAt: '2026-06-12T12:00:00Z',
+          },
+        ],
+      })
+    )
+    await page.goto('/admin/review')
+    await expect(page.getByText('Gone Leikeplass')).toBeVisible()
+    await expect(page.getByText('Other')).toBeVisible()
+    await expect(page.getByText('Replaced by a car park')).toBeVisible()
+  })
 })
 
 test.describe('admin page 390px layout', () => {

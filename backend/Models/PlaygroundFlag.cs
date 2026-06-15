@@ -17,5 +17,10 @@ public class PlaygroundFlag
 
     public FlagType FlagType { get; set; }
 
+    public FlagReason Reason { get; set; }
+
+    [MaxLength(200)]
+    public string? ReasonNote { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
 }

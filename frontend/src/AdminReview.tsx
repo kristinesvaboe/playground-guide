@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import './AdminReview.css'
-import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
+import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS, FLAG_REASON_LABELS } from './enrichmentOptions'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5100'
 const ADMIN_KEY = (import.meta.env.VITE_ADMIN_KEY as string | undefined) ?? ''
@@ -25,6 +25,8 @@ type HiddenPlayground = {
   longitude: number
   userId: string
   userName: string | null
+  reason: string
+  reasonNote: string | null
   createdAt: string
 }
 
@@ -193,6 +195,16 @@ function HiddenPlaygroundCard({
       <p className="card-field">
         <span className="field-label">Flagged by:</span> {playground.userName ?? playground.userId}
       </p>
+
+      <p className="card-field">
+        <span className="field-label">Reason:</span> {FLAG_REASON_LABELS[playground.reason] ?? playground.reason}
+      </p>
+
+      {playground.reasonNote && (
+        <p className="card-field">
+          <span className="field-label">Note:</span> {playground.reasonNote}
+        </p>
+      )}
 
       <p className="card-field">
         <a
