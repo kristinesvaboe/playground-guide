@@ -385,7 +385,7 @@ function App() {
             className="hide-mine-btn"
             onClick={() => hideFromMyView(preview.id)}
           >
-            Not interested
+            Hide from my map
           </button>
 
           <button
