@@ -128,6 +128,26 @@ function App() {
     return request.then(() => loadSaved()).catch(() => {})
   }
 
+  function flagNoLongerExists(id: string) {
+    if (!window.confirm('This hides the playground from the map for everyone. Only do this if it has really gone.')) return
+    fetch(`${API_URL}/playgrounds/${id}/flag`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: CURRENT_USER_ID, flagType: 'NoLongerExists' }),
+    })
+      .then((res) => {
+        // 409 means it was already flagged/hidden — either way it should disappear locally
+        if (res.ok || res.status === 409) {
+          setPlaygrounds((prev) => prev.filter((pg) => pg.id !== id))
+          setSelectedId(null)
+          return
+        }
+        // Don't let a failed hide masquerade as success (the pin would wrongly vanish)
+        window.alert("Couldn't hide this playground — please try again.")
+      })
+      .catch(() => window.alert("Couldn't hide this playground — please try again."))
+  }
+
   function loadPreview(id: string) {
     return fetch(`${API_URL}/playgrounds/${id}?userId=${CURRENT_USER_ID}`)
       .then((res) => res.json())
@@ -348,6 +368,13 @@ function App() {
             onClick={() => navigate(`/playground/${preview.id}`)}
           >
             View details
+          </button>
+
+          <button
+            className="flag-gone-btn"
+            onClick={() => flagNoLongerExists(preview.id)}
+          >
+            This playground no longer exists
           </button>
         </div>
       )}

@@ -102,6 +102,9 @@ The key must match `AdminKey` in `backend/appsettings.Development.json`. Use a s
 | `POST` | `/playgrounds/{id}/saved` | Saves the playground for later for the calling user. Body: `{ userId }`. Idempotent (no duplicate if already saved). Returns 204. 404 if the playground is unknown, 400 if the userId is unknown. |
 | `DELETE` | `/playgrounds/{id}/saved?userId=` | Removes the saved entry for the calling user. Idempotent (204 even if it wasn't saved). |
 | `GET` | `/saved?userId=` | Returns the user's saved playgrounds, newest first. Response: `[{ id, name, latitude, longitude }]`. Distance from the user is computed client-side; no user location is stored. |
+| `POST` | `/playgrounds/{id}/flag` | Flags a playground as no longer existing, which hides it from `GET /playgrounds` for everyone. Body: `{ userId, flagType }` (`flagType` currently only `NoLongerExists`). One flag is enough to hide. Returns 204. 404 if the playground is unknown, 400 if the userId or flagType is invalid, 409 if this user already flagged it. |
+| `POST` | `/admin/playgrounds/{id}/restore` | Un-hides a playground and removes its flag rows. Protected by `X-Admin-Key`. Returns 404 if not found. |
+| `GET` | `/admin/hidden-playgrounds` | Lists currently hidden playgrounds with their flag metadata, newest flag first. Protected by `X-Admin-Key`. Response: array of `{ id, name, latitude, longitude, userId, userName, createdAt }`. |
 
 ## Status
 
@@ -110,6 +113,7 @@ The key must match `AdminKey` in `backend/appsettings.Development.json`. Use a s
 - "View details" on the preview card opens a full detail page (`/playground/:id`) showing equipment, age suitability, size, other equipment, transport info, notes, and a small static map of the location; "Back to map" returns to the map re-centred on that playground
 - Equipment data comes from reviewed enrichments; unreviewed data is never shown
 - Users can add or edit playground details (age suitability, equipment, other equipment, size, transport info, notes — all optional, but at least one is required) via a mobile-first bottom-sheet form; submissions are held for review and only visible to their author until approved
-- Admin review page at `/admin/review` lets the app owner approve or reject pending enrichment submissions
+- Admin review page at `/admin/review` lets the app owner approve or reject pending enrichment submissions, and restore playgrounds that users have hidden
+- Users can flag a playground as "no longer exists" from the preview card (after a confirmation); one flag hides it from the map for everyone. The admin review page lists hidden playgrounds (with who flagged them and when) and can restore them
 - Users can favourite a playground from the preview card; favourited playgrounds show a heart on their map pin and appear in a Favourites list (opened from a button on the map) showing each playground's name and distance from the current location
 - Users can save a playground for later (distinct from favourites — "I want to go here") from the preview card; saved playgrounds show a bookmark on their map pin and appear in a Saved list (opened from a button on the map) showing each playground's name and distance from the current location. A playground that is both saved and favourited shows the heart on its pin.
