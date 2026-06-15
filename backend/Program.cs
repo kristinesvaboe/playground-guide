@@ -49,7 +49,7 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, AppD
     var centre = new Point(lng.Value, lat.Value) { SRID = 4326 };
 
     var playgrounds = await db.Playgrounds
-        .Where(p => p.Location.IsWithinDistance(centre, radiusDegrees))
+        .Where(p => !p.IsHidden && p.Location.IsWithinDistance(centre, radiusDegrees))
         .Select(p => new { p.Id, p.Name, p.Latitude, p.Longitude })
         .Take(200)
         .ToListAsync();
@@ -373,6 +373,87 @@ app.MapGet("/saved", async (Guid? userId, AppDbContext db) =>
     return Results.Ok(saved);
 });
 
+app.MapPost("/playgrounds/{id:guid}/flag", async (Guid id, FlagRequest body, AppDbContext db) =>
+{
+    var playground = await db.Playgrounds.FirstOrDefaultAsync(p => p.Id == id);
+    if (playground is null)
+        return Results.NotFound(new { error = "Playground not found." });
+
+    if (!await db.Users.AnyAsync(u => u.Id == body.UserId))
+        return Results.BadRequest(new { error = "Unknown userId." });
+
+    if (!Enum.TryParse<FlagType>(body.FlagType, out var flagType) || !Enum.IsDefined(flagType))
+        return Results.BadRequest(new { error = $"Unknown flagType value: {body.FlagType}." });
+
+    if (await db.PlaygroundFlags.AnyAsync(f => f.PlaygroundId == id && f.UserId == body.UserId))
+        return Results.Conflict(new { error = "You have already flagged this playground." });
+
+    db.PlaygroundFlags.Add(new PlaygroundFlag
+    {
+        PlaygroundId = id,
+        UserId = body.UserId,
+        FlagType = flagType,
+        CreatedAt = DateTimeOffset.UtcNow,
+    });
+    playground.IsHidden = true;
+
+    try
+    {
+        await db.SaveChangesAsync();
+    }
+    catch (DbUpdateException)
+    {
+        // Concurrent double-tap raced past the existence check; the unique index
+        // already prevents a duplicate, so treat it as the playground being flagged.
+        return Results.Conflict(new { error = "You have already flagged this playground." });
+    }
+
+    return Results.NoContent();
+});
+
+app.MapPost("/admin/playgrounds/{id:guid}/restore", async (Guid id, HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var playground = await db.Playgrounds.FirstOrDefaultAsync(p => p.Id == id);
+    if (playground is null)
+        return Results.NotFound(new { error = "Playground not found." });
+
+    var flags = await db.PlaygroundFlags.Where(f => f.PlaygroundId == id).ToListAsync();
+    db.PlaygroundFlags.RemoveRange(flags);
+    playground.IsHidden = false;
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { status = "restored" });
+});
+
+app.MapGet("/admin/hidden-playgrounds", async (HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var hidden = await db.PlaygroundFlags
+        .AsNoTracking()
+        .Where(f => f.Playground.IsHidden)
+        .Include(f => f.Playground)
+        .Include(f => f.User)
+        .OrderByDescending(f => f.CreatedAt)
+        .Select(f => new
+        {
+            f.Playground.Id,
+            f.Playground.Name,
+            f.Playground.Latitude,
+            f.Playground.Longitude,
+            f.UserId,
+            UserName = f.User.Name,
+            f.CreatedAt,
+        })
+        .ToListAsync();
+
+    return Results.Ok(hidden);
+});
+
 app.Run();
 
 static object ToEnrichmentResponse(PlaygroundEnrichment e) => new
@@ -459,3 +540,5 @@ record EnrichmentRequest(
 record FavouriteRequest(Guid UserId);
 
 record SavedRequest(Guid UserId);
+
+record FlagRequest(Guid UserId, string FlagType);

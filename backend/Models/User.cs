@@ -14,4 +14,6 @@ public class User
     public ICollection<UserFavourite> Favourites { get; set; } = [];
 
     public ICollection<UserSaved> Saved { get; set; } = [];
+
+    public ICollection<PlaygroundFlag> Flags { get; set; } = [];
 }

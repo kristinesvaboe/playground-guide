@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<User> Users => Set<User>();
     public DbSet<UserFavourite> UserFavourites => Set<UserFavourite>();
     public DbSet<UserSaved> UserSaved => Set<UserSaved>();
+    public DbSet<PlaygroundFlag> PlaygroundFlags => Set<PlaygroundFlag>();
 
     // Stable, hard-coded seed user. Shared with the Implementation agent and frontend.
     public static readonly Guid SeedUserId = new("a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d");
@@ -24,6 +25,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasIndex(p => p.OsmNodeId).IsUnique();
             // GiST index required for PostGIS spatial queries
             entity.HasIndex(p => p.Location).HasMethod("gist");
+            entity.Property(p => p.IsHidden).HasDefaultValue(false);
         });
 
         modelBuilder.Entity<PlaygroundEnrichment>(entity =>
@@ -119,6 +121,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                   .WithMany(u => u.Saved)
                   .HasForeignKey(s => s.UserId)
                   .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PlaygroundFlag>(entity =>
+        {
+            entity.ToTable("playground_flags");
+            entity.Property(f => f.FlagType)
+                  .HasColumnType("text")
+                  .HasConversion(new ValueConverter<FlagType, string>(
+                      v => v.ToString(),
+                      v => Enum.IsDefined(typeof(FlagType), v) ? Enum.Parse<FlagType>(v) : default
+                  ));
+            // RESTRICT protects flags: an OSM re-import or user deletion must not silently cascade-delete them
+            entity.HasOne(f => f.Playground)
+                  .WithMany(p => p.Flags)
+                  .HasForeignKey(f => f.PlaygroundId)
+                  .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(f => f.User)
+                  .WithMany(u => u.Flags)
+                  .HasForeignKey(f => f.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(f => new { f.PlaygroundId, f.UserId }).IsUnique();
         });
     }
 }

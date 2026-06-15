@@ -24,9 +24,13 @@ public class Playground
 
     public PlaygroundSource Source { get; set; }
 
+    public bool IsHidden { get; set; }
+
     public ICollection<PlaygroundEnrichment> Enrichments { get; set; } = [];
 
     public ICollection<UserFavourite> Favourites { get; set; } = [];
 
     public ICollection<UserSaved> Saved { get; set; } = [];
+
+    public ICollection<PlaygroundFlag> Flags { get; set; } = [];
 }
