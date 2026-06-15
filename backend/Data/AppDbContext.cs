@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<PlaygroundEnrichment> PlaygroundEnrichments => Set<PlaygroundEnrichment>();
     public DbSet<User> Users => Set<User>();
     public DbSet<UserFavourite> UserFavourites => Set<UserFavourite>();
+    public DbSet<UserSaved> UserSaved => Set<UserSaved>();
 
     // Stable, hard-coded seed user. Shared with the Implementation agent and frontend.
     public static readonly Guid SeedUserId = new("a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d");
@@ -102,6 +103,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.HasOne(f => f.User)
                   .WithMany(u => u.Favourites)
                   .HasForeignKey(f => f.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<UserSaved>(entity =>
+        {
+            entity.ToTable("user_saved");
+            entity.HasKey(s => new { s.UserId, s.PlaygroundId });
+            // RESTRICT protects saved entries: an OSM re-import or user deletion must not silently cascade-delete them
+            entity.HasOne(s => s.Playground)
+                  .WithMany(p => p.Saved)
+                  .HasForeignKey(s => s.PlaygroundId)
+                  .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(s => s.User)
+                  .WithMany(u => u.Saved)
+                  .HasForeignKey(s => s.UserId)
                   .OnDelete(DeleteBehavior.Restrict);
         });
     }

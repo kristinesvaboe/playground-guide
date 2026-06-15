@@ -10,7 +10,7 @@ import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 import { type Enrichment } from './EnrichmentForm'
 import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
 import { API_URL, CURRENT_USER_ID } from './config'
-import FavouritesList, { type Favourite } from './FavouritesList'
+import PlaceListPanel, { type Place } from './PlaceListPanel'
 
 // Leaflet's _getIconUrl prototype method ignores mergeOptions; delete it so the options are used instead
 delete (L.Icon.Default.prototype as any)._getIconUrl
@@ -26,7 +26,15 @@ const favouriteIcon = L.divIcon({
   iconAnchor: [20, 38],
 })
 
-// Pass an explicit default for non-favourite pins: icon={undefined} would override
+// Bookmark badge marker for saved pins; distinct colour from the favourite heart so the two read apart
+const savedIcon = L.divIcon({
+  className: 'saved-pin',
+  html: '<span aria-hidden="true">⚑</span>',
+  iconSize: [40, 40],
+  iconAnchor: [20, 38],
+})
+
+// Pass an explicit default for unmarked pins: icon={undefined} would override
 // Leaflet's built-in default with undefined and crash on createIcon()
 const defaultIcon = new L.Icon.Default()
 
@@ -72,17 +80,27 @@ function App() {
   const [playgrounds, setPlaygrounds] = useState<Playground[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [preview, setPreview] = useState<PlaygroundPreview | null>(null)
-  const [favourites, setFavourites] = useState<Favourite[]>([])
+  const [favourites, setFavourites] = useState<Place[]>([])
   const [favouritesOpen, setFavouritesOpen] = useState(false)
+  const [saved, setSaved] = useState<Place[]>([])
+  const [savedOpen, setSavedOpen] = useState(false)
 
   const moveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const favouriteIds = new Set(favourites.map((f) => f.id))
+  const savedIds = new Set(saved.map((s) => s.id))
 
   const loadFavourites = useCallback(() => {
     return fetch(`${API_URL}/favourites?userId=${CURRENT_USER_ID}`)
       .then((res) => res.json())
       .then(setFavourites)
+      .catch(() => {})
+  }, [])
+
+  const loadSaved = useCallback(() => {
+    return fetch(`${API_URL}/saved?userId=${CURRENT_USER_ID}`)
+      .then((res) => res.json())
+      .then(setSaved)
       .catch(() => {})
   }, [])
 
@@ -96,6 +114,18 @@ function App() {
           body: JSON.stringify({ userId: CURRENT_USER_ID }),
         })
     return request.then(() => loadFavourites()).catch(() => {})
+  }
+
+  function toggleSaved(id: string) {
+    const isSaved = savedIds.has(id)
+    const request = isSaved
+      ? fetch(`${API_URL}/playgrounds/${id}/saved?userId=${CURRENT_USER_ID}`, { method: 'DELETE' })
+      : fetch(`${API_URL}/playgrounds/${id}/saved`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: CURRENT_USER_ID }),
+        })
+    return request.then(() => loadSaved()).catch(() => {})
   }
 
   function loadPreview(id: string) {
@@ -161,6 +191,10 @@ function App() {
   }, [loadFavourites])
 
   useEffect(() => {
+    loadSaved()
+  }, [loadSaved])
+
+  useEffect(() => {
     if (!selectedId) {
       setPreview(null)
       return
@@ -184,24 +218,52 @@ function App() {
           <Marker
             key={pg.id}
             position={[pg.latitude, pg.longitude]}
-            icon={favouriteIds.has(pg.id) ? favouriteIcon : defaultIcon}
+            // Favourite outranks saved on the pin: "been and loved it" is the stronger signal than "want to go"
+            icon={
+              favouriteIds.has(pg.id)
+                ? favouriteIcon
+                : savedIds.has(pg.id)
+                  ? savedIcon
+                  : defaultIcon
+            }
             eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); setSelectedId(pg.id) } }}
           />
         ))}
       </MapContainer>
 
-      <button
-        className="favourites-toggle-btn"
-        onClick={() => setFavouritesOpen(true)}
-      >
-        <span aria-hidden="true">♥</span> Favourites
-      </button>
+      <div className="list-toggle-group">
+        <button
+          className="favourites-toggle-btn"
+          onClick={() => setFavouritesOpen(true)}
+        >
+          <span aria-hidden="true">♥</span> Favourites
+        </button>
+        <button
+          className="saved-list-toggle-btn"
+          onClick={() => setSavedOpen(true)}
+        >
+          <span aria-hidden="true">⚑</span> Saved
+        </button>
+      </div>
 
       {favouritesOpen && (
-        <FavouritesList
-          favourites={favourites}
+        <PlaceListPanel
+          title="Favourites"
+          items={favourites}
           position={position}
           onClose={() => setFavouritesOpen(false)}
+          emptyLabel="No favourites yet"
+          classPrefix="favourites"
+        />
+      )}
+      {savedOpen && (
+        <PlaceListPanel
+          title="Saved"
+          items={saved}
+          position={position}
+          onClose={() => setSavedOpen(false)}
+          emptyLabel="No saved playgrounds yet"
+          classPrefix="saved"
         />
       )}
       {preview && (
@@ -209,12 +271,20 @@ function App() {
           <div className="preview-card-header">
             <h2>{preview.name ?? 'Playground'}</h2>
             <button
+              onClick={() => toggleSaved(preview.id)}
+              aria-label={savedIds.has(preview.id) ? 'Remove from saved' : 'Save for later'}
+              aria-pressed={savedIds.has(preview.id)}
+              className="saved-toggle-btn"
+            >
+              <span aria-hidden="true">{savedIds.has(preview.id) ? '⚑' : '⚐'}</span>
+            </button>
+            <button
               onClick={() => toggleFavourite(preview.id)}
               aria-label={favouriteIds.has(preview.id) ? 'Remove from favourites' : 'Add to favourites'}
               aria-pressed={favouriteIds.has(preview.id)}
               className="favourite-toggle-btn"
             >
-              {favouriteIds.has(preview.id) ? '♥' : '♡'}
+              <span aria-hidden="true">{favouriteIds.has(preview.id) ? '♥' : '♡'}</span>
             </button>
             <button
               onClick={() => setSelectedId(null)}
