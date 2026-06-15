@@ -14,7 +14,7 @@ import { API_URL, CURRENT_USER_ID } from './config'
 import PlaceListPanel, { type Place } from './PlaceListPanel'
 
 // Leaflet's _getIconUrl prototype method ignores mergeOptions; delete it so the options are used instead
-delete (L.Icon.Default.prototype as any)._getIconUrl
+delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl
 L.Icon.Default.mergeOptions({ iconUrl, iconRetinaUrl, shadowUrl })
 
 const STAVANGER: [number, number] = [58.9700, 5.7331]
@@ -77,7 +77,11 @@ function App() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const focusId = searchParams.get('focus')
-  const [position, setPosition] = useState<[number, number] | null>(null)
+  // Default to Stavanger immediately when there's neither a focus target nor a
+  // geolocation API; the async cases (focus fetch, geolocation) resolve in the effect.
+  const [position, setPosition] = useState<[number, number] | null>(() =>
+    !focusId && !navigator.geolocation ? STAVANGER : null
+  )
   const [playgrounds, setPlaygrounds] = useState<Playground[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [preview, setPreview] = useState<PlaygroundPreview | null>(null)
@@ -190,14 +194,14 @@ function App() {
       return
     }
 
-    if (!navigator.geolocation) {
-      setPosition(STAVANGER)
-      return
+    // No-geolocation fallback is handled by the position initializer (above), so the
+    // effect only ever sets state from async callbacks.
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setPosition([pos.coords.latitude, pos.coords.longitude]),
+        () => setPosition(STAVANGER)
+      )
     }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setPosition([pos.coords.latitude, pos.coords.longitude]),
-      () => setPosition(STAVANGER)
-    )
   }, [focusId])
 
   useEffect(() => {
@@ -214,10 +218,7 @@ function App() {
   }, [loadSaved])
 
   useEffect(() => {
-    if (!selectedId) {
-      setPreview(null)
-      return
-    }
+    if (!selectedId) return
     loadPreview(selectedId).catch(() => {})
   }, [selectedId])
 
@@ -285,7 +286,7 @@ function App() {
           classPrefix="saved"
         />
       )}
-      {preview && (
+      {selectedId && preview && preview.id === selectedId && (
         <div className="preview-card">
           <div className="preview-card-header">
             <h2>{preview.name ?? 'Playground'}</h2>
