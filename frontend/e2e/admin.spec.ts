@@ -19,6 +19,7 @@ const MOCK_SUBMISSION = {
 // match more than one element).
 test.beforeEach(async ({ page }) => {
   await page.route('**/admin/hidden-playgrounds', (route) => route.fulfill({ json: [] }))
+  await page.route('**/admin/flagged-playgrounds', (route) => route.fulfill({ json: [] }))
 })
 
 test.describe('admin review page', () => {

@@ -35,6 +35,14 @@ const savedIcon = L.divIcon({
   iconAnchor: [20, 38],
 })
 
+// Warning badge marker for flagged-but-still-visible pins; amber so it reads apart from favourite/saved
+const flaggedIcon = L.divIcon({
+  className: 'flagged-pin',
+  html: '<span aria-hidden="true">⚠</span>',
+  iconSize: [40, 40],
+  iconAnchor: [20, 38],
+})
+
 // Pass an explicit default for unmarked pins: icon={undefined} would override
 // Leaflet's built-in default with undefined and crash on createIcon()
 const defaultIcon = new L.Icon.Default()
@@ -44,6 +52,8 @@ type Playground = {
   name: string | null
   latitude: number
   longitude: number
+  flagCount: number
+  isHidden: boolean
 }
 
 type PlaygroundPreview = {
@@ -140,10 +150,21 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: CURRENT_USER_ID, flagType: 'NoLongerExists', reason, reasonNote }),
     })
-    // 409 means it was already flagged/hidden — either way it should disappear locally
-    if (res.ok || res.status === 409) {
-      setPlaygrounds((prev) => prev.filter((pg) => pg.id !== id))
-      setSelectedId(null)
+    if (res.ok) {
+      const { flagCount, isHidden } = (await res.json()) as { flagCount: number; isHidden: boolean }
+      if (isHidden) {
+        // Reached the community threshold: drop the pin and close the preview
+        setPlaygrounds((prev) => prev.filter((pg) => pg.id !== id))
+        setSelectedId(null)
+      } else {
+        // Still visible but now reported: flip the pin to the flagged state, keep it on the map
+        setPlaygrounds((prev) => prev.map((pg) => (pg.id === id ? { ...pg, flagCount } : pg)))
+      }
+      setFlaggingId(null)
+      return
+    }
+    // 409 means this user already flagged it — leave the pin as-is, just close
+    if (res.status === 409) {
       setFlaggingId(null)
       return
     }
@@ -225,6 +246,8 @@ function App() {
   if (!position) return null
 
   const pending = preview?.myEnrichment && !preview.myEnrichment.reviewed
+  // flagCount lives on the list endpoint, not the detail/preview endpoint, so read it from list state
+  const selected = playgrounds.find((pg) => pg.id === selectedId)
 
   return (
     <>
@@ -238,13 +261,16 @@ function App() {
           <Marker
             key={pg.id}
             position={[pg.latitude, pg.longitude]}
-            // Favourite outranks saved on the pin: "been and loved it" is the stronger signal than "want to go"
+            // Flagged outranks everything: a "no longer exists" warning matters more than favourite/saved.
+            // Otherwise favourite outranks saved: "been and loved it" is a stronger signal than "want to go".
             icon={
-              favouriteIds.has(pg.id)
-                ? favouriteIcon
-                : savedIds.has(pg.id)
-                  ? savedIcon
-                  : defaultIcon
+              pg.flagCount > 0
+                ? flaggedIcon
+                : favouriteIds.has(pg.id)
+                  ? favouriteIcon
+                  : savedIds.has(pg.id)
+                    ? savedIcon
+                    : defaultIcon
             }
             eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); setSelectedId(pg.id) } }}
           />
@@ -370,12 +396,26 @@ function App() {
             View details
           </button>
 
-          <button
-            className="flag-gone-btn"
-            onClick={() => setFlaggingId(preview.id)}
-          >
-            This playground no longer exists
-          </button>
+          {selected && selected.flagCount > 0 ? (
+            <>
+              <p className="flag-notice">
+                This playground has been reported as no longer existing. Is this correct?
+              </p>
+              <button
+                className="flag-confirm-btn"
+                onClick={() => submitFlag(preview.id, 'Other', null)}
+              >
+                Yes, it's gone
+              </button>
+            </>
+          ) : (
+            <button
+              className="flag-gone-btn"
+              onClick={() => setFlaggingId(preview.id)}
+            >
+              This playground no longer exists
+            </button>
+          )}
         </div>
       )}
 
