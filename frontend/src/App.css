@@ -490,11 +490,38 @@ body,
 .saved-row {
   display: flex;
   align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.favourites-row-main,
+.saved-row-main {
+  background: none;
+  border: none;
+  padding: 8px 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex: 1;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   min-height: 44px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f3f4f6;
+  text-align: left;
+}
+
+.favourites-row-remove,
+.saved-row-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 1.3rem;
+  line-height: 1;
+  flex-shrink: 0;
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .favourites-row-name,
