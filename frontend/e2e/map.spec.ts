@@ -23,7 +23,7 @@ test('playground pins are visible', async ({ page }) => {
 // Interaction tests: pin click, card, dismiss. Skipped on mobile-390 because markers
 // can fall outside the 390px viewport bounds and Playwright won't click them.
 test.describe('map interactions', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'markers may be outside 390px viewport')
   })
 
@@ -73,7 +73,7 @@ test.describe('map interactions', () => {
 // Re-fetch on pan/zoom. Skipped on mobile-390 because the smaller viewport makes the
 // drag distance unreliable for moving the map centre meaningfully.
 test.describe('re-fetch on map move', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'drag distance unreliable at 390px')
   })
 
@@ -111,7 +111,7 @@ test.describe('re-fetch on map move', () => {
 
 // Layout tests: only meaningful at the 390px viewport the mobile-390 project provides.
 test.describe('390px layout', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
   })
 

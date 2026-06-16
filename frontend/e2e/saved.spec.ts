@@ -37,7 +37,7 @@ test.describe('saved (chromium)', () => {
   // Serial: these tests share the same saved row, so parallel runs interfere.
   test.describe.configure({ mode: 'serial' })
 
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'markers may be outside 390px viewport')
   })
 
@@ -94,7 +94,7 @@ test.describe('saved (chromium)', () => {
 })
 
 test.describe('saved 390px layout', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
   })
 
