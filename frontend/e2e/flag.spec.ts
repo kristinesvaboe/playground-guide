@@ -3,8 +3,10 @@ import { useTestUser } from './test-user'
 
 // These tests require the full local stack: Docker (Postgres/PostGIS) +
 // backend on :5100 + frontend dev server on :5173. They exercise the real
-// "no longer exists" flag flow, which hides a playground globally (IsHidden).
-// global-teardown restores it and deletes the test user's flags afterwards.
+// "no longer exists" flag flow. A single flag no longer hides a playground —
+// it takes 3 community flags to cross the hide threshold — so one flag from the
+// test user flips the pin to the flagged warning state but keeps it on the map.
+// global-teardown deletes the test user's flags afterwards.
 
 test.use({
   geolocation: { latitude: 58.97, longitude: 5.7331 },
@@ -44,7 +46,7 @@ test.describe('flag no longer exists (chromium)', () => {
     await expect(page.locator('.leaflet-marker-icon').nth(2)).toBeVisible()
   })
 
-  test('choosing a reason flags the playground and hides it from the map', async ({ page }) => {
+  test('choosing a reason flags the playground but keeps it on the map below threshold', async ({ page }) => {
     await openThirdPreview(page)
     const before = await page.locator('.leaflet-marker-icon').count()
 
@@ -57,16 +59,15 @@ test.describe('flag no longer exists (chromium)', () => {
     ])
     expect(response.ok()).toBeTruthy()
 
+    // One flag is below the 3-flag threshold: the dialog closes but the pin stays,
+    // now in the flagged warning state. The marker count is unchanged.
     await expect(page.locator('.flag-reason-dialog')).not.toBeVisible()
-    await expect(page.locator('.preview-card')).not.toBeVisible()
-    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(before - 1)
+    await expect(page.locator('.leaflet-marker-icon')).toHaveCount(before)
+    await expect(page.locator('.leaflet-marker-icon.flagged-pin')).toBeVisible()
 
-    // Persisted: a reload still excludes the hidden playground. hide.spec may hide
-    // another playground for the same user in parallel, so the reloaded count can drop
-    // below before-1 — assert it dropped, not the exact figure.
+    // Persisted: a reload still shows the playground (not hidden) with its flagged pin.
     await page.reload()
-    await expect(page.locator('.leaflet-marker-icon').first()).toBeVisible({ timeout: 10000 })
-    await expect.poll(() => page.locator('.leaflet-marker-icon').count()).toBeLessThan(before)
+    await expect(page.locator('.leaflet-marker-icon.flagged-pin')).toBeVisible({ timeout: 10000 })
   })
 })
 

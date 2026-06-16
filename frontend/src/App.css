@@ -137,6 +137,31 @@ body,
   cursor: pointer;
 }
 
+.flag-notice {
+  margin: 12px 0 8px;
+  padding: 10px 12px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 0.9rem;
+}
+
+.flag-confirm-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  min-height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: #d97706;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .muted {
   color: #9ca3af;
   font-size: 0.9rem;
@@ -395,6 +420,15 @@ body,
   font-size: 32px;
   line-height: 1;
   color: #2563eb;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Warning badge for flagged-but-visible map pins; amber, distinct from favourite red and saved blue */
+.flagged-pin {
+  font-size: 32px;
+  line-height: 1;
+  color: #d97706;
   text-align: center;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }

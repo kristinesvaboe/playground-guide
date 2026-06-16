@@ -52,7 +52,7 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, Guid
         .Where(p => !p.IsHidden
             && p.Location.IsWithinDistance(centre, radiusDegrees)
             && (userId == null || !db.UserHiddenPlaygrounds.Any(h => h.UserId == userId && h.PlaygroundId == p.Id)))
-        .Select(p => new { p.Id, p.Name, p.Latitude, p.Longitude })
+        .Select(p => new { p.Id, p.Name, p.Latitude, p.Longitude, FlagCount = p.Flags.Count, p.IsHidden })
         .Take(200)
         .ToListAsync();
 
@@ -406,6 +406,8 @@ app.MapPost("/playgrounds/{id:guid}/hide", async (Guid id, HideRequest body, App
     return Results.NoContent();
 });
 
+const int FlagsToHideThreshold = 3;
+
 app.MapPost("/playgrounds/{id:guid}/flag", async (Guid id, FlagRequest body, AppDbContext db) =>
 {
     var playground = await db.Playgrounds.FirstOrDefaultAsync(p => p.Id == id);
@@ -440,7 +442,10 @@ app.MapPost("/playgrounds/{id:guid}/flag", async (Guid id, FlagRequest body, App
         ReasonNote = reasonNote,
         CreatedAt = DateTimeOffset.UtcNow,
     });
-    playground.IsHidden = true;
+
+    var newCount = await db.PlaygroundFlags.CountAsync(f => f.PlaygroundId == id) + 1;
+    if (newCount >= FlagsToHideThreshold)
+        playground.IsHidden = true;
 
     try
     {
@@ -453,7 +458,7 @@ app.MapPost("/playgrounds/{id:guid}/flag", async (Guid id, FlagRequest body, App
         return Results.Conflict(new { error = "You have already flagged this playground." });
     }
 
-    return Results.NoContent();
+    return Results.Ok(new { flagCount = newCount, isHidden = playground.IsHidden });
 });
 
 app.MapPost("/admin/playgrounds/{id:guid}/restore", async (Guid id, HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
@@ -499,6 +504,44 @@ app.MapGet("/admin/hidden-playgrounds", async (HttpContext ctx, IConfiguration c
         .ToListAsync();
 
     return Results.Ok(hidden);
+});
+
+app.MapGet("/admin/flagged-playgrounds", async (HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var flagged = await db.Playgrounds
+        .AsNoTracking()
+        .Where(p => !p.IsHidden && p.Flags.Any())
+        .Select(p => new
+        {
+            p.Id,
+            p.Name,
+            p.Latitude,
+            p.Longitude,
+            FlagCount = p.Flags.Count,
+            LatestFlaggedAt = p.Flags.Max(f => f.CreatedAt),
+        })
+        .OrderByDescending(p => p.FlagCount)
+        .ToListAsync();
+
+    return Results.Ok(flagged);
+});
+
+app.MapPost("/admin/playgrounds/{id:guid}/force-hide", async (Guid id, HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var playground = await db.Playgrounds.FirstOrDefaultAsync(p => p.Id == id);
+    if (playground is null)
+        return Results.NotFound(new { error = "Playground not found." });
+
+    playground.IsHidden = true;
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { status = "hidden" });
 });
 
 app.Run();

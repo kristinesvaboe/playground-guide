@@ -30,6 +30,15 @@ type HiddenPlayground = {
   createdAt: string
 }
 
+type FlaggedPlayground = {
+  id: string
+  name: string | null
+  latitude: number
+  longitude: number
+  flagCount: number
+  latestFlaggedAt: string
+}
+
 function formatDate(iso: string): string {
   return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
@@ -158,6 +167,71 @@ function SubmissionCard({
   )
 }
 
+function FlaggedPlaygroundCard({
+  playground,
+  onRemove,
+}: {
+  playground: FlaggedPlayground
+  onRemove: (id: string) => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const label = playground.name ?? `${playground.latitude}, ${playground.longitude}`
+
+  async function handleForceHide() {
+    setSaving(true)
+    setError(null)
+    const res = await fetch(`${API_URL}/admin/playgrounds/${playground.id}/force-hide`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': ADMIN_KEY },
+    }).catch(() => null)
+    setSaving(false)
+    if (!res?.ok) {
+      setError('Failed to hide — please try again.')
+      return
+    }
+    onRemove(playground.id)
+  }
+
+  return (
+    <div className="submission-card">
+      <div className="card-meta">
+        <h2 className="card-title">{label}</h2>
+        <span className="card-date">{formatDate(playground.latestFlaggedAt)}</span>
+      </div>
+
+      <p className="card-field">
+        <span className="field-label">Flags:</span> {playground.flagCount} of 3 flags
+      </p>
+
+      <p className="card-field">
+        <a
+          className="map-link"
+          href={`https://www.openstreetmap.org/?mlat=${playground.latitude}&mlon=${playground.longitude}#map=18/${playground.latitude}/${playground.longitude}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          View on map
+        </a>
+      </p>
+
+      {error && <p className="card-error" role="alert">{error}</p>}
+
+      <div className="card-actions">
+        <button
+          type="button"
+          className="btn-reject"
+          onClick={handleForceHide}
+          disabled={saving}
+        >
+          Force hide
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function HiddenPlaygroundCard({
   playground,
   onRemove,
@@ -240,6 +314,9 @@ export default function AdminReview() {
   const [hidden, setHidden] = useState<HiddenPlayground[]>([])
   const [hiddenLoading, setHiddenLoading] = useState(true)
   const [hiddenError, setHiddenError] = useState<string | null>(null)
+  const [flagged, setFlagged] = useState<FlaggedPlayground[]>([])
+  const [flaggedLoading, setFlaggedLoading] = useState(true)
+  const [flaggedError, setFlaggedError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/admin/enrichments`, {
@@ -269,6 +346,24 @@ export default function AdminReview() {
       .finally(() => setHiddenLoading(false))
   }, [])
 
+  useEffect(() => {
+    fetch(`${API_URL}/admin/flagged-playgrounds`, {
+      headers: { 'X-Admin-Key': ADMIN_KEY },
+    })
+      .then((res) => {
+        if (res.status === 401) throw new Error('Unauthorized — check your admin key.')
+        if (!res.ok) throw new Error('Failed to load flagged playgrounds.')
+        return res.json() as Promise<FlaggedPlayground[]>
+      })
+      .then(setFlagged)
+      .catch((err) => setFlaggedError(err instanceof Error ? err.message : 'Failed to load.'))
+      .finally(() => setFlaggedLoading(false))
+  }, [])
+
+  function removeFlagged(id: string) {
+    setFlagged((prev) => prev.filter((f) => f.id !== id))
+  }
+
   function removeSubmission(id: string) {
     setSubmissions((prev) => prev.filter((s) => s.id !== id))
   }
@@ -287,6 +382,16 @@ export default function AdminReview() {
       )}
       {submissions.map((s) => (
         <SubmissionCard key={s.id} submission={s} onRemove={removeSubmission} />
+      ))}
+
+      <h1>Flagged playgrounds</h1>
+      {flaggedLoading && <p className="admin-status">Loading…</p>}
+      {flaggedError && <p className="admin-error" role="alert">{flaggedError}</p>}
+      {!flaggedLoading && !flaggedError && flagged.length === 0 && (
+        <p className="admin-status">No flagged playgrounds.</p>
+      )}
+      {flagged.map((f) => (
+        <FlaggedPlaygroundCard key={f.id} playground={f} onRemove={removeFlagged} />
       ))}
 
       <h1>Hidden playgrounds</h1>
