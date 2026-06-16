@@ -73,7 +73,9 @@ export default function PlaceListPanel({
                     type="button"
                     className={`${classPrefix}-row-remove`}
                     aria-label={removeLabel}
-                    onClick={() => onRemove(item.id)}
+                    onClick={() => {
+                      if (window.confirm(`${removeLabel}?`)) onRemove(item.id)
+                    }}
                   >
                     <span aria-hidden="true">×</span>
                   </button>

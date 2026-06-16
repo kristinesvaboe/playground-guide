@@ -97,6 +97,7 @@ test.describe('favourites (chromium)', () => {
 
     await page.locator('.favourites-toggle-btn').click()
     await expect(page.locator('.favourites-row')).toHaveCount(1)
+    page.once('dialog', (dialog) => dialog.accept())
     await page.locator('.favourites-row-remove').first().click()
 
     await expect(page.locator('.favourites-panel .muted')).toHaveText('No favourites yet')

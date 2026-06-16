@@ -99,6 +99,7 @@ test.describe('saved (chromium)', () => {
 
     await page.locator('.saved-list-toggle-btn').click()
     await expect(page.locator('.saved-row')).toHaveCount(1)
+    page.once('dialog', (dialog) => dialog.accept())
     await page.locator('.saved-row-remove').first().click()
 
     // Scope to the saved panel: a bare .muted also matches the preview card's "No details added yet".
