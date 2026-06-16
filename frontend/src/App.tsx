@@ -223,6 +223,25 @@ function App() {
     setSavedOpen(false)
   }
 
+  // Only one overlay at a time: each open action closes the preview card and the other list panel.
+  function handleSelectPin(id: string) {
+    setFavouritesOpen(false)
+    setSavedOpen(false)
+    setSelectedId(id)
+  }
+
+  function openFavourites() {
+    setSelectedId(null)
+    setSavedOpen(false)
+    setFavouritesOpen(true)
+  }
+
+  function openSaved() {
+    setSelectedId(null)
+    setFavouritesOpen(false)
+    setSavedOpen(true)
+  }
+
   // Drop any pending debounced fetch if the map unmounts mid-interaction
   useEffect(() => () => {
     if (moveTimeout.current) clearTimeout(moveTimeout.current)
@@ -300,7 +319,7 @@ function App() {
                     ? savedIcon
                     : defaultIcon
             }
-            eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); setSelectedId(pg.id) } }}
+            eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); handleSelectPin(pg.id) } }}
           />
         ))}
       </MapContainer>
@@ -308,13 +327,13 @@ function App() {
       <div className="list-toggle-group">
         <button
           className="favourites-toggle-btn"
-          onClick={() => setFavouritesOpen(true)}
+          onClick={openFavourites}
         >
           <span aria-hidden="true">♥</span> Favourites
         </button>
         <button
           className="saved-list-toggle-btn"
-          onClick={() => setSavedOpen(true)}
+          onClick={openSaved}
         >
           <span aria-hidden="true">⚑</span> Saved
         </button>
