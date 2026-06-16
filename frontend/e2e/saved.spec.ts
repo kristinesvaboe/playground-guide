@@ -79,6 +79,33 @@ test.describe('saved (chromium)', () => {
     await expect(page.locator('.saved-row')).toHaveCount(1)
   })
 
+  test('tapping a saved row opens the preview and closes the panel', async ({ page }) => {
+    await openPreview(page)
+    await ensureSaved(page)
+    await page.locator('.preview-close-btn').click()
+
+    await page.locator('.saved-list-toggle-btn').click()
+    await expect(page.locator('.saved-panel')).toBeVisible()
+    await page.locator('.saved-row-main').first().click()
+
+    await expect(page.locator('.saved-panel')).toHaveCount(0)
+    await expect(page.locator('.preview-card')).toBeVisible()
+  })
+
+  test('the row remove button removes the entry from the saved list', async ({ page }) => {
+    await openPreview(page)
+    await ensureSaved(page)
+    await page.locator('.preview-close-btn').click()
+
+    await page.locator('.saved-list-toggle-btn').click()
+    await expect(page.locator('.saved-row')).toHaveCount(1)
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.locator('.saved-row-remove').first().click()
+
+    // Scope to the saved panel: a bare .muted also matches the preview card's "No details added yet".
+    await expect(page.locator('.saved-panel .muted')).toHaveText('No saved playgrounds yet')
+  })
+
   test('unsaving removes the entry from the list', async ({ page }) => {
     await openPreview(page)
     await ensureSaved(page)

@@ -77,6 +77,32 @@ test.describe('favourites (chromium)', () => {
     await expect(page.locator('.favourites-row')).toHaveCount(1)
   })
 
+  test('tapping a favourites row opens the preview and closes the panel', async ({ page }) => {
+    await openPreview(page)
+    await ensureFavourited(page)
+    await page.locator('.preview-close-btn').click()
+
+    await page.locator('.favourites-toggle-btn').click()
+    await expect(page.locator('.favourites-panel')).toBeVisible()
+    await page.locator('.favourites-row-main').first().click()
+
+    await expect(page.locator('.favourites-panel')).toHaveCount(0)
+    await expect(page.locator('.preview-card')).toBeVisible()
+  })
+
+  test('the row remove button removes the entry from the favourites list', async ({ page }) => {
+    await openPreview(page)
+    await ensureFavourited(page)
+    await page.locator('.preview-close-btn').click()
+
+    await page.locator('.favourites-toggle-btn').click()
+    await expect(page.locator('.favourites-row')).toHaveCount(1)
+    page.once('dialog', (dialog) => dialog.accept())
+    await page.locator('.favourites-row-remove').first().click()
+
+    await expect(page.locator('.favourites-panel .muted')).toHaveText('No favourites yet')
+  })
+
   test('unfavouriting removes the entry from the list', async ({ page }) => {
     await openPreview(page)
     await ensureFavourited(page)

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
@@ -83,6 +83,17 @@ function MapEvents({
   return null
 }
 
+// The map is mounted once, so a centre prop change won't move it. This child sits inside
+// MapContainer and recentres imperatively. A fresh array each tap re-fires the effect even
+// for the same coordinates.
+function FlyToTarget({ target }: { target: [number, number] | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (target) map.flyTo(target, Math.max(map.getZoom(), 15))
+  }, [target, map])
+  return null
+}
+
 function App() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -100,8 +111,11 @@ function App() {
   const [saved, setSaved] = useState<Place[]>([])
   const [savedOpen, setSavedOpen] = useState(false)
   const [flaggingId, setFlaggingId] = useState<string | null>(null)
+  const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null)
 
   const moveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Set when a list tap recentres the map, so the resulting moveend doesn't clear the selection it just opened.
+  const keepSelectionOnMove = useRef(false)
 
   const favouriteIds = new Set(favourites.map((f) => f.id))
   const savedIds = new Set(saved.map((s) => s.id))
@@ -187,14 +201,27 @@ function App() {
 
   const handleMoveEnd = useCallback(
     (lat: number, lng: number, radius: number) => {
+      if (moveTimeout.current) clearTimeout(moveTimeout.current)
+      moveTimeout.current = setTimeout(() => loadPlaygrounds(lat, lng, radius), 350)
+      // A programmatic recentre from a list tap must keep the just-opened preview.
+      if (keepSelectionOnMove.current) {
+        keepSelectionOnMove.current = false
+        return
+      }
       // Panning away is a "show me elsewhere" gesture: drop the open preview so it
       // can't keep pointing at a marker that's about to leave the result set.
       setSelectedId(null)
-      if (moveTimeout.current) clearTimeout(moveTimeout.current)
-      moveTimeout.current = setTimeout(() => loadPlaygrounds(lat, lng, radius), 350)
     },
     [loadPlaygrounds]
   )
+
+  function handleSelectFromList(item: Place) {
+    keepSelectionOnMove.current = true
+    setFlyTarget([item.latitude, item.longitude])
+    setSelectedId(item.id)
+    setFavouritesOpen(false)
+    setSavedOpen(false)
+  }
 
   // Drop any pending debounced fetch if the map unmounts mid-interaction
   useEffect(() => () => {
@@ -257,6 +284,7 @@ function App() {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
         <MapEvents onMapClick={() => setSelectedId(null)} onMoveEnd={handleMoveEnd} />
+        <FlyToTarget target={flyTarget} />
         {playgrounds.map((pg) => (
           <Marker
             key={pg.id}
@@ -298,7 +326,10 @@ function App() {
           items={favourites}
           position={position}
           onClose={() => setFavouritesOpen(false)}
+          onSelect={handleSelectFromList}
+          onRemove={(id) => toggleFavourite(id)}
           emptyLabel="No favourites yet"
+          removeLabel="Remove from favourites"
           classPrefix="favourites"
         />
       )}
@@ -308,7 +339,10 @@ function App() {
           items={saved}
           position={position}
           onClose={() => setSavedOpen(false)}
+          onSelect={handleSelectFromList}
+          onRemove={(id) => toggleSaved(id)}
           emptyLabel="No saved playgrounds yet"
+          removeLabel="Remove from saved"
           classPrefix="saved"
         />
       )}

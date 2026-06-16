@@ -17,14 +17,20 @@ export default function PlaceListPanel({
   items,
   position,
   onClose,
+  onSelect,
+  onRemove,
   emptyLabel,
+  removeLabel,
   classPrefix,
 }: {
   title: string
   items: Place[]
   position: [number, number]
   onClose: () => void
+  onSelect: (item: Place) => void
+  onRemove: (id: string) => void
   emptyLabel: string
+  removeLabel: string
   // Distinct per-list class names so favourites and saved keep separate styling and E2E selectors
   classPrefix: string
 }) {
@@ -53,10 +59,26 @@ export default function PlaceListPanel({
             <ul className={`${classPrefix}-list`}>
               {sorted.map((item) => (
                 <li key={item.id} className={`${classPrefix}-row`}>
-                  <span className={`${classPrefix}-row-name`}>{item.name ?? 'Playground'}</span>
-                  <span className={`${classPrefix}-row-distance`}>
-                    {formatDistance(here.distanceTo([item.latitude, item.longitude]))}
-                  </span>
+                  <button
+                    type="button"
+                    className={`${classPrefix}-row-main`}
+                    onClick={() => onSelect(item)}
+                  >
+                    <span className={`${classPrefix}-row-name`}>{item.name ?? 'Playground'}</span>
+                    <span className={`${classPrefix}-row-distance`}>
+                      {formatDistance(here.distanceTo([item.latitude, item.longitude]))}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${classPrefix}-row-remove`}
+                    aria-label={removeLabel}
+                    onClick={() => {
+                      if (window.confirm(`${removeLabel}?`)) onRemove(item.id)
+                    }}
+                  >
+                    <span aria-hidden="true">×</span>
+                  </button>
                 </li>
               ))}
             </ul>
