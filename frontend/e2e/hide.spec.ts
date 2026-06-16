@@ -29,7 +29,7 @@ test.describe('hide from my view (chromium)', () => {
   // Serial: the tests hide the same playground, so parallel runs interfere.
   test.describe.configure({ mode: 'serial' })
 
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'markers may be outside 390px viewport')
   })
 
@@ -60,7 +60,7 @@ test.describe('hide from my view (chromium)', () => {
 })
 
 test.describe('hide button 390px layout', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
   })
 

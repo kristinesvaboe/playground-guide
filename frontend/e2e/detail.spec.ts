@@ -47,7 +47,7 @@ const FULL_DETAIL = {
 }
 
 test.describe('playground detail (chromium)', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'interaction tested on chromium')
   })
 
@@ -127,7 +127,7 @@ test.describe('playground detail (chromium)', () => {
 })
 
 test.describe('playground detail 390px layout', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
   })
 

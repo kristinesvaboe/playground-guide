@@ -31,7 +31,7 @@ test.describe('flag no longer exists (chromium)', () => {
   // Serial: the tests share the same marker and hide it, so parallel runs interfere.
   test.describe.configure({ mode: 'serial' })
 
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'markers may be outside 390px viewport')
   })
 
@@ -72,7 +72,7 @@ test.describe('flag no longer exists (chromium)', () => {
 })
 
 test.describe('flag button 390px layout', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
   })
 

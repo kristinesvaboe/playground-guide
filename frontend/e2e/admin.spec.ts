@@ -23,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 })
 
 test.describe('admin review page', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'interaction tests run on chromium only')
   })
 
@@ -118,7 +118,7 @@ test.describe('admin review page', () => {
 })
 
 test.describe('admin page 390px layout', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
   })
 

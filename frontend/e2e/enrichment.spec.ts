@@ -35,7 +35,7 @@ test.describe('enrichment form (chromium)', () => {
   // Serial mode: tests write to the same DB row; running in parallel causes 409 conflicts.
   test.describe.configure({ mode: 'serial' })
 
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name === 'mobile-390', 'interaction tested on chromium')
   })
 
@@ -95,7 +95,7 @@ test.describe('enrichment form (chromium)', () => {
 })
 
 test.describe('enrichment form 390px layout', () => {
-  test.beforeEach(({}, testInfo) => {
+  test.beforeEach((_, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile-390', 'layout tested at 390px only')
   })
 
