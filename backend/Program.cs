@@ -51,8 +51,20 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, Guid
     var playgrounds = await db.Playgrounds
         .Where(p => !p.IsHidden
             && p.Location.IsWithinDistance(centre, radiusDegrees)
-            && (userId == null || !db.UserHiddenPlaygrounds.Any(h => h.UserId == userId && h.PlaygroundId == p.Id)))
-        .Select(p => new { p.Id, p.Name, p.Latitude, p.Longitude, FlagCount = p.Flags.Count, p.IsHidden })
+            && (userId == null || !db.UserHiddenPlaygrounds.Any(h => h.UserId == userId && h.PlaygroundId == p.Id))
+            && (p.Source == PlaygroundSource.Osm
+                || p.Enrichments.Any(e => e.UserId == userId)
+                || p.Enrichments.Any(e => e.Reviewed)))
+        .Select(p => new
+        {
+            p.Id,
+            p.Name,
+            p.Latitude,
+            p.Longitude,
+            FlagCount = p.Flags.Count,
+            p.IsHidden,
+            Pending = p.Source == PlaygroundSource.UserSubmitted && !p.Enrichments.Any(e => e.Reviewed),
+        })
         .Take(200)
         .ToListAsync();
 
@@ -67,6 +79,17 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
 
     if (playground is null)
         return Results.NotFound();
+
+    // A user-submitted playground is private until approved: only its submitter may read it
+    // directly. Hide it from everyone else (404, not 403, so its existence isn't leaked).
+    if (playground.Source == PlaygroundSource.UserSubmitted)
+    {
+        var hasReviewed = await db.PlaygroundEnrichments.AnyAsync(e => e.PlaygroundId == id && e.Reviewed);
+        var callerOwns = userId is not null
+            && await db.PlaygroundEnrichments.AnyAsync(e => e.PlaygroundId == id && e.UserId == userId);
+        if (!hasReviewed && !callerOwns)
+            return Results.NotFound();
+    }
 
     var reviewed = await db.PlaygroundEnrichments
         .AsNoTracking()
@@ -180,6 +203,60 @@ app.MapPut("/playgrounds/{id:guid}/enrichment", async (Guid id, EnrichmentReques
     await db.SaveChangesAsync();
 
     return Results.Ok(ToEnrichmentResponse(enrichment));
+});
+
+app.MapPost("/playgrounds", async (CreatePlaygroundRequest body, AppDbContext db) =>
+{
+    if (!await db.Users.AnyAsync(u => u.Id == body.UserId))
+        return Results.BadRequest(new { error = "Unknown userId." });
+
+    if (body.Latitude is < -90 or > 90)
+        return Results.BadRequest(new { error = "latitude must be between -90 and 90." });
+
+    if (body.Longitude is < -180 or > 180)
+        return Results.BadRequest(new { error = "longitude must be between -180 and 180." });
+
+    if (!string.IsNullOrWhiteSpace(body.Name) && body.Name.Trim().Length > 120)
+        return Results.BadRequest(new { error = "name must be 120 characters or fewer." });
+
+    var (error, equipment, ageSuitability, size) = ParseEnrichmentFields(
+        body.Equipment, body.AgeSuitability, body.Size, body.OtherEquipment, body.TransportInfo, body.Notes);
+    if (error is not null)
+        return error;
+
+    var playground = new Playground
+    {
+        Source = PlaygroundSource.UserSubmitted,
+        OsmNodeId = null,
+        Name = string.IsNullOrWhiteSpace(body.Name) ? null : body.Name.Trim(),
+        Latitude = body.Latitude,
+        Longitude = body.Longitude,
+        Location = new Point(body.Longitude, body.Latitude) { SRID = 4326 },
+        OsmTags = "{}",
+        IsHidden = false,
+    };
+    db.Playgrounds.Add(playground);
+
+    // Always create the enrichment row, even when empty: it records the submitter (ownership
+    // is inferred from it) and its Reviewed flag is the approval gate, mirroring enrichment HITL.
+    db.PlaygroundEnrichments.Add(new PlaygroundEnrichment
+    {
+        PlaygroundId = playground.Id,
+        UserId = body.UserId,
+        Equipment = equipment!,
+        AgeSuitability = ageSuitability!,
+        Size = size,
+        OtherEquipment = string.IsNullOrWhiteSpace(body.OtherEquipment) ? null : body.OtherEquipment.Trim(),
+        TransportInfo = string.IsNullOrWhiteSpace(body.TransportInfo) ? null : body.TransportInfo.Trim(),
+        Notes = string.IsNullOrWhiteSpace(body.Notes) ? null : body.Notes.Trim(),
+        Reviewed = false,
+        CreatedAt = DateTimeOffset.UtcNow,
+    });
+
+    await db.SaveChangesAsync();
+
+    return Results.Created($"/playgrounds/{playground.Id}",
+        new { playground.Id, playground.Latitude, playground.Longitude, playground.Name, Pending = true });
 });
 
 app.MapGet("/admin/enrichments", async (HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
@@ -566,14 +643,36 @@ static async Task<(IResult? Error, List<EquipmentType>? Equipment, List<AgeSuita
     if (!await db.Users.AnyAsync(u => u.Id == body.UserId))
         return (Results.BadRequest(new { error = "Unknown userId." }), null, null, null);
 
-    if (!string.IsNullOrWhiteSpace(body.TransportInfo) && body.TransportInfo.Trim().Length > 200)
+    var (error, equipment, ageSuitability, size) = ParseEnrichmentFields(
+        body.Equipment, body.AgeSuitability, body.Size, body.OtherEquipment, body.TransportInfo, body.Notes);
+    if (error is not null)
+        return (error, null, null, null);
+
+    if (equipment!.Count == 0
+        && ageSuitability!.Count == 0
+        && size is null
+        && string.IsNullOrWhiteSpace(body.OtherEquipment)
+        && string.IsNullOrWhiteSpace(body.TransportInfo)
+        && string.IsNullOrWhiteSpace(body.Notes))
+        return (Results.BadRequest(new { error = "Please add at least one detail before saving." }), null, null, null);
+
+    return (null, equipment, ageSuitability, size);
+}
+
+// Enum-parses and length-checks the enrichment detail fields shared by the enrichment
+// endpoints and the new-playground POST. Does NOT enforce "at least one detail" — that
+// guard belongs only to the enrichment endpoints, since a location-only submission is valid.
+static (IResult? Error, List<EquipmentType>? Equipment, List<AgeSuitability>? AgeSuitability, PlaygroundSize? Size) ParseEnrichmentFields(
+    string[]? rawEquipment, string[]? rawAgeSuitability, string? rawSize, string? otherEquipment, string? transportInfo, string? notes)
+{
+    if (!string.IsNullOrWhiteSpace(transportInfo) && transportInfo.Trim().Length > 200)
         return (Results.BadRequest(new { error = "transportInfo must be 200 characters or fewer." }), null, null, null);
 
-    if (!string.IsNullOrWhiteSpace(body.Notes) && body.Notes.Trim().Length > 300)
+    if (!string.IsNullOrWhiteSpace(notes) && notes.Trim().Length > 300)
         return (Results.BadRequest(new { error = "notes must be 300 characters or fewer." }), null, null, null);
 
     var equipment = new List<EquipmentType>();
-    foreach (var raw in body.Equipment ?? [])
+    foreach (var raw in rawEquipment ?? [])
     {
         if (!Enum.TryParse<EquipmentType>(raw, out var value) || !Enum.IsDefined(value))
             return (Results.BadRequest(new { error = $"Unknown equipment value: {raw}." }), null, null, null);
@@ -581,7 +680,7 @@ static async Task<(IResult? Error, List<EquipmentType>? Equipment, List<AgeSuita
     }
 
     var ageSuitability = new List<AgeSuitability>();
-    foreach (var raw in body.AgeSuitability ?? [])
+    foreach (var raw in rawAgeSuitability ?? [])
     {
         if (!Enum.TryParse<AgeSuitability>(raw, out var value) || !Enum.IsDefined(value))
             return (Results.BadRequest(new { error = $"Unknown age suitability value: {raw}." }), null, null, null);
@@ -589,23 +688,15 @@ static async Task<(IResult? Error, List<EquipmentType>? Equipment, List<AgeSuita
     }
 
     PlaygroundSize? size = null;
-    if (!string.IsNullOrEmpty(body.Size))
+    if (!string.IsNullOrEmpty(rawSize))
     {
-        if (!Enum.TryParse<PlaygroundSize>(body.Size, out var parsedSize) || !Enum.IsDefined(parsedSize))
-            return (Results.BadRequest(new { error = $"Unknown size value: {body.Size}." }), null, null, null);
+        if (!Enum.TryParse<PlaygroundSize>(rawSize, out var parsedSize) || !Enum.IsDefined(parsedSize))
+            return (Results.BadRequest(new { error = $"Unknown size value: {rawSize}." }), null, null, null);
         size = parsedSize;
     }
 
-    if (!string.IsNullOrWhiteSpace(body.OtherEquipment) && body.OtherEquipment.Trim().Length > 200)
+    if (!string.IsNullOrWhiteSpace(otherEquipment) && otherEquipment.Trim().Length > 200)
         return (Results.BadRequest(new { error = "otherEquipment must be 200 characters or fewer." }), null, null, null);
-
-    if (equipment.Count == 0
-        && ageSuitability.Count == 0
-        && size is null
-        && string.IsNullOrWhiteSpace(body.OtherEquipment)
-        && string.IsNullOrWhiteSpace(body.TransportInfo)
-        && string.IsNullOrWhiteSpace(body.Notes))
-        return (Results.BadRequest(new { error = "Please add at least one detail before saving." }), null, null, null);
 
     return (null, equipment, ageSuitability, size);
 }
@@ -620,6 +711,18 @@ static bool AdminKeyValid(HttpContext ctx, IConfiguration cfg)
 
 record EnrichmentRequest(
     Guid UserId,
+    string[]? Equipment,
+    string[]? AgeSuitability,
+    string? Size,
+    string? OtherEquipment,
+    string? TransportInfo,
+    string? Notes);
+
+record CreatePlaygroundRequest(
+    Guid UserId,
+    double Latitude,
+    double Longitude,
+    string? Name,
     string[]? Equipment,
     string[]? AgeSuitability,
     string? Size,

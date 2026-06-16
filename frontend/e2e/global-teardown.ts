@@ -27,7 +27,7 @@ export default function globalTeardown() {
         '-d',
         'playgroundguide',
         '-c',
-        `UPDATE playgrounds SET "IsHidden" = false WHERE "Id" IN (SELECT "PlaygroundId" FROM playground_flags WHERE "UserId" = '${TEST_USER_ID}'); DELETE FROM playground_flags WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM playground_enrichments WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_favourites WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_saved WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_hidden_playgrounds WHERE "UserId" = '${TEST_USER_ID}';`,
+        `UPDATE playgrounds SET "IsHidden" = false WHERE "Id" IN (SELECT "PlaygroundId" FROM playground_flags WHERE "UserId" = '${TEST_USER_ID}'); DELETE FROM playground_flags WHERE "UserId" = '${TEST_USER_ID}'; WITH mine AS (SELECT "Id" FROM playgrounds WHERE "Source" = 1 AND "Id" IN (SELECT "PlaygroundId" FROM playground_enrichments WHERE "UserId" = '${TEST_USER_ID}')), de AS (DELETE FROM playground_enrichments WHERE "PlaygroundId" IN (SELECT "Id" FROM mine)) DELETE FROM playgrounds WHERE "Id" IN (SELECT "Id" FROM mine); DELETE FROM playground_enrichments WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_favourites WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_saved WHERE "UserId" = '${TEST_USER_ID}'; DELETE FROM user_hidden_playgrounds WHERE "UserId" = '${TEST_USER_ID}';`,
       ],
       { cwd: repoRoot, stdio: 'pipe' }
     )

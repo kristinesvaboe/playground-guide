@@ -8,6 +8,7 @@ import iconUrl from 'leaflet/dist/images/marker-icon.png'
 import iconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png'
 import shadowUrl from 'leaflet/dist/images/marker-shadow.png'
 import { type Enrichment } from './EnrichmentForm'
+import AddPlaygroundForm, { type NewPlaygroundDraft } from './AddPlaygroundForm'
 import FlagReasonDialog from './FlagReasonDialog'
 import { EQUIPMENT_LABELS, AGE_LABELS, SIZE_LABELS } from './enrichmentOptions'
 import { API_URL, CURRENT_USER_ID } from './config'
@@ -43,6 +44,15 @@ const flaggedIcon = L.divIcon({
   iconAnchor: [20, 38],
 })
 
+// Grey badge marker for the submitter's own not-yet-approved submissions; distinct from
+// favourite red / saved blue / flagged amber so a pending pin reads as "awaiting review"
+const pendingIcon = L.divIcon({
+  className: 'pending-pin',
+  html: '<span aria-hidden="true">⏳</span>',
+  iconSize: [40, 40],
+  iconAnchor: [20, 38],
+})
+
 // Pass an explicit default for unmarked pins: icon={undefined} would override
 // Leaflet's built-in default with undefined and crash on createIcon()
 const defaultIcon = new L.Icon.Default()
@@ -54,6 +64,7 @@ type Playground = {
   longitude: number
   flagCount: number
   isHidden: boolean
+  pending: boolean
 }
 
 type PlaygroundPreview = {
@@ -69,11 +80,11 @@ function MapEvents({
   onMapClick,
   onMoveEnd,
 }: {
-  onMapClick: () => void
+  onMapClick: (latlng: L.LatLng) => void
   onMoveEnd: (lat: number, lng: number, radius: number) => void
 }) {
   const map = useMapEvents({
-    click: onMapClick,
+    click: (e) => onMapClick(e.latlng),
     moveend: () => {
       const center = map.getCenter()
       const radius = Math.round(map.distance(center, map.getBounds().getNorthEast()))
@@ -112,6 +123,8 @@ function App() {
   const [savedOpen, setSavedOpen] = useState(false)
   const [flaggingId, setFlaggingId] = useState<string | null>(null)
   const [flyTarget, setFlyTarget] = useState<[number, number] | null>(null)
+  const [addingPin, setAddingPin] = useState(false)
+  const [newPin, setNewPin] = useState<[number, number] | null>(null)
 
   const moveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Set when a list tap recentres the map, so the resulting moveend doesn't clear the selection it just opened.
@@ -193,11 +206,42 @@ function App() {
   }
 
   const loadPlaygrounds = useCallback((lat: number, lng: number, radius: number) => {
-    fetch(`${API_URL}/playgrounds?lat=${lat}&lng=${lng}&radius=${radius}&userId=${CURRENT_USER_ID}`)
+    return fetch(`${API_URL}/playgrounds?lat=${lat}&lng=${lng}&radius=${radius}&userId=${CURRENT_USER_ID}`)
       .then((res) => res.json())
       .then(setPlaygrounds)
       .catch(() => {})
   }, [])
+
+  function startAddingPin() {
+    setSelectedId(null)
+    setFavouritesOpen(false)
+    setSavedOpen(false)
+    setAddingPin(true)
+  }
+
+  function handleMapClick(latlng: L.LatLng) {
+    if (addingPin) {
+      setAddingPin(false)
+      setNewPin([latlng.lat, latlng.lng])
+      return
+    }
+    setSelectedId(null)
+  }
+
+  async function submitNewPlayground(draft: NewPlaygroundDraft) {
+    if (!newPin) return
+    const [latitude, longitude] = newPin
+    const res = await fetch(`${API_URL}/playgrounds`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: CURRENT_USER_ID, latitude, longitude, ...draft }),
+    })
+    if (!res.ok) throw new Error("Couldn't add the playground — please try again.")
+    const { id } = (await res.json()) as { id: string }
+    setNewPin(null)
+    await loadPlaygrounds(latitude, longitude, 5000)
+    setSelectedId(id)
+  }
 
   const handleMoveEnd = useCallback(
     (lat: number, lng: number, radius: number) => {
@@ -302,22 +346,26 @@ function App() {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
-        <MapEvents onMapClick={() => setSelectedId(null)} onMoveEnd={handleMoveEnd} />
+        <MapEvents onMapClick={handleMapClick} onMoveEnd={handleMoveEnd} />
         <FlyToTarget target={flyTarget} />
+        {newPin && <Marker position={newPin} icon={defaultIcon} />}
         {playgrounds.map((pg) => (
           <Marker
             key={pg.id}
             position={[pg.latitude, pg.longitude]}
             // Flagged outranks everything: a "no longer exists" warning matters more than favourite/saved.
+            // Pending (the submitter's own unapproved pin) ranks next so it reads as awaiting review.
             // Otherwise favourite outranks saved: "been and loved it" is a stronger signal than "want to go".
             icon={
               pg.flagCount > 0
                 ? flaggedIcon
-                : favouriteIds.has(pg.id)
-                  ? favouriteIcon
-                  : savedIds.has(pg.id)
-                    ? savedIcon
-                    : defaultIcon
+                : pg.pending
+                  ? pendingIcon
+                  : favouriteIds.has(pg.id)
+                    ? favouriteIcon
+                    : savedIds.has(pg.id)
+                      ? savedIcon
+                      : defaultIcon
             }
             eventHandlers={{ click: (e) => { e.originalEvent.stopPropagation(); handleSelectPin(pg.id) } }}
           />
@@ -338,6 +386,29 @@ function App() {
           <span aria-hidden="true">⚑</span> Saved
         </button>
       </div>
+
+      <button className="add-playground-btn" onClick={startAddingPin}>
+        <span aria-hidden="true">＋</span> Add playground
+      </button>
+
+      {addingPin && (
+        <div className="add-pin-banner" role="status">
+          <span>Tap the map to place the playground</span>
+          <button className="btn-ghost" onClick={() => setAddingPin(false)}>
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {newPin && (
+        <AddPlaygroundForm
+          onCancel={() => {
+            setNewPin(null)
+            setAddingPin(false)
+          }}
+          onSubmit={submitNewPlayground}
+        />
+      )}
 
       {favouritesOpen && (
         <PlaceListPanel
