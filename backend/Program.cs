@@ -52,9 +52,7 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, Guid
         .Where(p => !p.IsHidden
             && p.Location.IsWithinDistance(centre, radiusDegrees)
             && (userId == null || !db.UserHiddenPlaygrounds.Any(h => h.UserId == userId && h.PlaygroundId == p.Id))
-            && (p.Source == PlaygroundSource.Osm
-                || p.SubmittedByUserId == userId
-                || p.Enrichments.Any(e => e.Reviewed)))
+            && (p.Approved || p.SubmittedByUserId == userId))
         .Select(p => new
         {
             p.Id,
@@ -63,7 +61,7 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, Guid
             p.Longitude,
             FlagCount = p.Flags.Count,
             p.IsHidden,
-            Pending = p.Source == PlaygroundSource.UserSubmitted && !p.Enrichments.Any(e => e.Reviewed),
+            Pending = p.Source == PlaygroundSource.UserSubmitted && !p.Approved,
         })
         .Take(200)
         .ToListAsync();
@@ -80,13 +78,13 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
     if (playground is null)
         return Results.NotFound();
 
-    // A user-submitted playground is private until approved: only its submitter may read it
-    // directly. Hide it from everyone else (404, not 403, so its existence isn't leaked).
-    if (playground.Source == PlaygroundSource.UserSubmitted)
+    // A user-submitted playground is gated on approval: until an admin approves it, only its
+    // submitter may read it directly. Hide it from everyone else (404, not 403, so its
+    // existence isn't leaked).
+    if (playground.Source == PlaygroundSource.UserSubmitted && !playground.Approved)
     {
-        var hasReviewed = await db.PlaygroundEnrichments.AnyAsync(e => e.PlaygroundId == id && e.Reviewed);
         var callerOwns = userId is not null && playground.SubmittedByUserId == userId;
-        if (!hasReviewed && !callerOwns)
+        if (!callerOwns)
             return Results.NotFound();
     }
 
@@ -228,6 +226,7 @@ app.MapPost("/playgrounds", async (CreatePlaygroundRequest body, AppDbContext db
         Source = PlaygroundSource.UserSubmitted,
         OsmNodeId = null,
         SubmittedByUserId = body.UserId,
+        Approved = false,
         Name = string.IsNullOrWhiteSpace(body.Name) ? null : body.Name.Trim(),
         Latitude = body.Latitude,
         Longitude = body.Longitude,
@@ -619,6 +618,100 @@ app.MapPost("/admin/playgrounds/{id:guid}/force-hide", async (Guid id, HttpConte
     await db.SaveChangesAsync();
 
     return Results.Ok(new { status = "hidden" });
+});
+
+app.MapGet("/admin/pending-playgrounds", async (HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    // Two-step shape: query the playgrounds (with submitter name), then load each submitter's
+    // own enrichment row, so the enum value-converter materialises the lists in memory rather
+    // than inside the projection — same approach as /admin/enrichments.
+    var pending = await db.Playgrounds
+        .AsNoTracking()
+        .Where(p => p.Source == PlaygroundSource.UserSubmitted && !p.Approved)
+        .Select(p => new
+        {
+            p.Id,
+            p.Name,
+            p.Latitude,
+            p.Longitude,
+            p.SubmittedByUserId,
+            SubmitterName = db.Users.Where(u => u.Id == p.SubmittedByUserId).Select(u => u.Name).FirstOrDefault(),
+        })
+        .ToListAsync();
+
+    var playgroundIds = pending.Select(p => p.Id).ToList();
+    var enrichments = await db.PlaygroundEnrichments
+        .AsNoTracking()
+        .Where(e => playgroundIds.Contains(e.PlaygroundId))
+        .ToListAsync();
+
+    var shaped = pending
+        .Select(p =>
+        {
+            var enrichment = enrichments.FirstOrDefault(e => e.PlaygroundId == p.Id && e.UserId == p.SubmittedByUserId);
+            return new
+            {
+                p.Id,
+                p.Name,
+                p.Latitude,
+                p.Longitude,
+                p.SubmittedByUserId,
+                p.SubmitterName,
+                Equipment = enrichment?.Equipment.Select(eq => eq.ToString()).ToList() ?? [],
+                AgeSuitability = enrichment?.AgeSuitability.Select(a => a.ToString()).ToList() ?? [],
+                Size = enrichment?.Size?.ToString(),
+                OtherEquipment = enrichment?.OtherEquipment,
+                TransportInfo = enrichment?.TransportInfo,
+                Notes = enrichment?.Notes,
+                CreatedAt = enrichment?.CreatedAt,
+            };
+        })
+        .OrderByDescending(p => p.CreatedAt)
+        .ToList();
+
+    return Results.Ok(shaped);
+});
+
+app.MapPost("/admin/playgrounds/{id:guid}/approve", async (Guid id, HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var playground = await db.Playgrounds.FirstOrDefaultAsync(p => p.Id == id);
+    if (playground is null)
+        return Results.NotFound(new { error = "Playground not found." });
+
+    playground.Approved = true;
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { status = "approved" });
+});
+
+app.MapDelete("/admin/playgrounds/{id:guid}", async (Guid id, HttpContext ctx, IConfiguration cfg, AppDbContext db) =>
+{
+    if (!AdminKeyValid(ctx, cfg))
+        return Results.StatusCode(401);
+
+    var playground = await db.Playgrounds.FirstOrDefaultAsync(p => p.Id == id);
+    if (playground is null)
+        return Results.NotFound(new { error = "Playground not found." });
+
+    if (playground.Source != PlaygroundSource.UserSubmitted)
+        return Results.BadRequest(new { error = "Only user-submitted playgrounds can be rejected." });
+
+    // RESTRICT FKs block the playground delete while dependents exist, so clear them first.
+    db.PlaygroundEnrichments.RemoveRange(db.PlaygroundEnrichments.Where(e => e.PlaygroundId == id));
+    db.UserFavourites.RemoveRange(db.UserFavourites.Where(f => f.PlaygroundId == id));
+    db.UserSaved.RemoveRange(db.UserSaved.Where(s => s.PlaygroundId == id));
+    db.PlaygroundFlags.RemoveRange(db.PlaygroundFlags.Where(f => f.PlaygroundId == id));
+    db.UserHiddenPlaygrounds.RemoveRange(db.UserHiddenPlaygrounds.Where(h => h.PlaygroundId == id));
+    db.Playgrounds.Remove(playground);
+    await db.SaveChangesAsync();
+
+    return Results.NoContent();
 });
 
 app.Run();

@@ -28,6 +28,10 @@ public class Playground
     // record of who created the playground, independent of the enrichment row.
     public Guid? SubmittedByUserId { get; set; }
 
+    // OSM rows are trusted and approved on import; user-submitted playgrounds start false and
+    // become publicly visible only once an admin approves them.
+    public bool Approved { get; set; }
+
     public bool IsHidden { get; set; }
 
     public ICollection<PlaygroundEnrichment> Enrichments { get; set; } = [];

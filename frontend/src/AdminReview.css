@@ -56,6 +56,17 @@ body {
   white-space: nowrap;
 }
 
+.user-submitted-badge {
+  display: inline-block;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
 .admin-equipment-tags {
   display: flex;
   flex-wrap: wrap;

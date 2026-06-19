@@ -30,6 +30,22 @@ type HiddenPlayground = {
   createdAt: string
 }
 
+type PendingPlayground = {
+  id: string
+  name: string | null
+  latitude: number
+  longitude: number
+  submittedByUserId: string
+  submitterName: string | null
+  equipment: string[]
+  ageSuitability: string[]
+  size: string | null
+  otherEquipment: string | null
+  transportInfo: string | null
+  notes: string | null
+  createdAt: string
+}
+
 type FlaggedPlayground = {
   id: string
   name: string | null
@@ -142,6 +158,138 @@ function SubmissionCard({
           </button>
         </div>
       )}
+
+      {error && <p className="card-error" role="alert">{error}</p>}
+
+      <div className="card-actions">
+        <button
+          type="button"
+          className="btn-approve"
+          onClick={handleApprove}
+          disabled={saving}
+        >
+          Approve
+        </button>
+        <button
+          type="button"
+          className="btn-reject"
+          onClick={handleReject}
+          disabled={saving}
+        >
+          Reject
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PendingPlaygroundCard({
+  playground,
+  onRemove,
+}: {
+  playground: PendingPlayground
+  onRemove: (id: string) => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const label = playground.name ?? `${playground.latitude}, ${playground.longitude}`
+
+  async function handleApprove() {
+    setSaving(true)
+    setError(null)
+    const res = await fetch(`${API_URL}/admin/playgrounds/${playground.id}/approve`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': ADMIN_KEY },
+    }).catch(() => null)
+    setSaving(false)
+    if (!res?.ok) {
+      setError('Failed to approve — please try again.')
+      return
+    }
+    onRemove(playground.id)
+  }
+
+  async function handleReject() {
+    if (!window.confirm('Reject and permanently delete this playground?')) return
+    setSaving(true)
+    setError(null)
+    const res = await fetch(`${API_URL}/admin/playgrounds/${playground.id}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-Key': ADMIN_KEY },
+    }).catch(() => null)
+    setSaving(false)
+    if (!res?.ok) {
+      setError('Failed to delete — please try again.')
+      return
+    }
+    onRemove(playground.id)
+  }
+
+  return (
+    <div className="submission-card">
+      <div className="card-meta">
+        <h2 className="card-title">{label}</h2>
+        <span className="card-date">{formatDate(playground.createdAt)}</span>
+      </div>
+
+      <span className="user-submitted-badge">User submitted</span>
+
+      <p className="card-field">
+        <span className="field-label">Submitted by:</span>{' '}
+        {playground.submitterName ?? playground.submittedByUserId}
+      </p>
+
+      {playground.equipment.length > 0 && (
+        <div className="admin-equipment-tags">
+          {playground.equipment.map((eq) => (
+            <span key={eq} className="admin-equipment-tag">{EQUIPMENT_LABELS[eq] ?? eq}</span>
+          ))}
+        </div>
+      )}
+
+      {playground.ageSuitability.length > 0 && (
+        <div className="admin-equipment-tags">
+          {playground.ageSuitability.map((a) => (
+            <span key={a} className="admin-equipment-tag">{AGE_LABELS[a] ?? a}</span>
+          ))}
+        </div>
+      )}
+
+      {playground.size && (
+        <p className="card-field">
+          <span className="field-label">Size:</span> {SIZE_LABELS[playground.size] ?? playground.size}
+        </p>
+      )}
+
+      {playground.otherEquipment && (
+        <p className="card-field">
+          <span className="field-label">Other equipment:</span> {playground.otherEquipment}
+        </p>
+      )}
+
+      {playground.transportInfo && (
+        <p className="card-field">
+          <span className="field-label">Transport:</span> {playground.transportInfo}
+        </p>
+      )}
+
+      {playground.notes && (
+        <p className="card-field">
+          <span className="field-label">Notes:</span> {playground.notes}
+        </p>
+      )}
+
+      <p className="card-field">
+        <a
+          className="map-link"
+          href={`https://www.openstreetmap.org/?mlat=${playground.latitude}&mlon=${playground.longitude}#map=18/${playground.latitude}/${playground.longitude}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          View on map
+        </a>
+      </p>
 
       {error && <p className="card-error" role="alert">{error}</p>}
 
@@ -317,6 +465,9 @@ export default function AdminReview() {
   const [flagged, setFlagged] = useState<FlaggedPlayground[]>([])
   const [flaggedLoading, setFlaggedLoading] = useState(true)
   const [flaggedError, setFlaggedError] = useState<string | null>(null)
+  const [pending, setPending] = useState<PendingPlayground[]>([])
+  const [pendingLoading, setPendingLoading] = useState(true)
+  const [pendingError, setPendingError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`${API_URL}/admin/enrichments`, {
@@ -360,6 +511,24 @@ export default function AdminReview() {
       .finally(() => setFlaggedLoading(false))
   }, [])
 
+  useEffect(() => {
+    fetch(`${API_URL}/admin/pending-playgrounds`, {
+      headers: { 'X-Admin-Key': ADMIN_KEY },
+    })
+      .then((res) => {
+        if (res.status === 401) throw new Error('Unauthorized — check your admin key.')
+        if (!res.ok) throw new Error('Failed to load pending playgrounds.')
+        return res.json() as Promise<PendingPlayground[]>
+      })
+      .then(setPending)
+      .catch((err) => setPendingError(err instanceof Error ? err.message : 'Failed to load.'))
+      .finally(() => setPendingLoading(false))
+  }, [])
+
+  function removePending(id: string) {
+    setPending((prev) => prev.filter((p) => p.id !== id))
+  }
+
   function removeFlagged(id: string) {
     setFlagged((prev) => prev.filter((f) => f.id !== id))
   }
@@ -382,6 +551,16 @@ export default function AdminReview() {
       )}
       {submissions.map((s) => (
         <SubmissionCard key={s.id} submission={s} onRemove={removeSubmission} />
+      ))}
+
+      <h1>Pending playgrounds</h1>
+      {pendingLoading && <p className="admin-status">Loading…</p>}
+      {pendingError && <p className="admin-error" role="alert">{pendingError}</p>}
+      {!pendingLoading && !pendingError && pending.length === 0 && (
+        <p className="admin-status">No playgrounds awaiting approval.</p>
+      )}
+      {pending.map((p) => (
+        <PendingPlaygroundCard key={p.id} playground={p} onRemove={removePending} />
       ))}
 
       <h1>Flagged playgrounds</h1>
