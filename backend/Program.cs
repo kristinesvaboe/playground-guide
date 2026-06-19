@@ -265,7 +265,10 @@ app.MapGet("/admin/enrichments", async (HttpContext ctx, IConfiguration cfg, App
 
     var entities = await db.PlaygroundEnrichments
         .AsNoTracking()
-        .Where(e => !e.Reviewed)
+        // Exclude enrichments on unapproved user-submitted playgrounds: those are reviewed via the
+        // "Pending playgrounds" approval queue, not here, so they don't appear in both queues.
+        .Where(e => !e.Reviewed
+            && !(e.Playground.Source == PlaygroundSource.UserSubmitted && !e.Playground.Approved))
         .Include(e => e.Playground)
         .OrderByDescending(e => e.CreatedAt)
         .ToListAsync();
@@ -685,6 +688,18 @@ app.MapPost("/admin/playgrounds/{id:guid}/approve", async (Guid id, HttpContext 
         return Results.NotFound(new { error = "Playground not found." });
 
     playground.Approved = true;
+
+    // The submitter's own enrichment was vetted as part of approving the playground, so mark it
+    // reviewed at the same time — it shouldn't need a second pass in the enrichment queue.
+    if (playground.SubmittedByUserId is not null)
+    {
+        var submissionEnrichments = await db.PlaygroundEnrichments
+            .Where(e => e.PlaygroundId == id && e.UserId == playground.SubmittedByUserId)
+            .ToListAsync();
+        foreach (var enrichment in submissionEnrichments)
+            enrichment.Reviewed = true;
+    }
+
     await db.SaveChangesAsync();
 
     return Results.Ok(new { status = "approved" });
