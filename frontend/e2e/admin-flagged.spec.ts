@@ -16,6 +16,7 @@ const MOCK_FLAGGED = {
 test.beforeEach(async ({ page }) => {
   await page.route('**/admin/enrichments', (route) => route.fulfill({ json: [] }))
   await page.route('**/admin/hidden-playgrounds', (route) => route.fulfill({ json: [] }))
+  await page.route('**/admin/pending-playgrounds', (route) => route.fulfill({ json: [] }))
 })
 
 test.describe('admin flagged playgrounds (chromium)', () => {

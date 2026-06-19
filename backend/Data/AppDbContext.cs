@@ -27,6 +27,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             // GiST index required for PostGIS spatial queries
             entity.HasIndex(p => p.Location).HasMethod("gist");
             entity.Property(p => p.IsHidden).HasDefaultValue(false);
+            entity.Property(p => p.Approved).HasDefaultValue(true);
             entity.HasIndex(p => p.SubmittedByUserId);
             // RESTRICT protects submissions: deleting a user must not cascade-delete the playgrounds they added
             entity.HasOne<User>()
