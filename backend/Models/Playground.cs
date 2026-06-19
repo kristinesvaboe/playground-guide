@@ -24,6 +24,10 @@ public class Playground
 
     public PlaygroundSource Source { get; set; }
 
+    // Set for source = user_submitted rows; null for OSM-imported playgrounds. The canonical
+    // record of who created the playground, independent of the enrichment row.
+    public Guid? SubmittedByUserId { get; set; }
+
     public bool IsHidden { get; set; }
 
     public ICollection<PlaygroundEnrichment> Enrichments { get; set; } = [];

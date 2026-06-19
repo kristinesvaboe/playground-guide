@@ -53,7 +53,7 @@ app.MapGet("/playgrounds", async (double? lat, double? lng, double? radius, Guid
             && p.Location.IsWithinDistance(centre, radiusDegrees)
             && (userId == null || !db.UserHiddenPlaygrounds.Any(h => h.UserId == userId && h.PlaygroundId == p.Id))
             && (p.Source == PlaygroundSource.Osm
-                || p.Enrichments.Any(e => e.UserId == userId)
+                || p.SubmittedByUserId == userId
                 || p.Enrichments.Any(e => e.Reviewed)))
         .Select(p => new
         {
@@ -85,8 +85,7 @@ app.MapGet("/playgrounds/{id:guid}", async (Guid id, Guid? userId, AppDbContext 
     if (playground.Source == PlaygroundSource.UserSubmitted)
     {
         var hasReviewed = await db.PlaygroundEnrichments.AnyAsync(e => e.PlaygroundId == id && e.Reviewed);
-        var callerOwns = userId is not null
-            && await db.PlaygroundEnrichments.AnyAsync(e => e.PlaygroundId == id && e.UserId == userId);
+        var callerOwns = userId is not null && playground.SubmittedByUserId == userId;
         if (!hasReviewed && !callerOwns)
             return Results.NotFound();
     }
@@ -228,6 +227,7 @@ app.MapPost("/playgrounds", async (CreatePlaygroundRequest body, AppDbContext db
     {
         Source = PlaygroundSource.UserSubmitted,
         OsmNodeId = null,
+        SubmittedByUserId = body.UserId,
         Name = string.IsNullOrWhiteSpace(body.Name) ? null : body.Name.Trim(),
         Latitude = body.Latitude,
         Longitude = body.Longitude,
