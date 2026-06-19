@@ -40,6 +40,38 @@ test.describe('admin pending playgrounds (chromium)', () => {
     await expect(page.getByText('User submitted')).toBeVisible()
     await expect(page.getByText('Kristine')).toBeVisible()
     await expect(page.getByText('Swing')).toBeVisible()
+
+    // Regression (#59 follow-up): the date must render (not the epoch fallback, not empty)
+    const dateText = (await page.locator('.card-date').first().innerText()).trim()
+    expect(dateText.length).toBeGreaterThan(0)
+    expect(dateText).not.toContain('1970')
+
+    // and "Submitted by:" must carry a value, not just the label
+    const submittedBy = (
+      await page.locator('p.card-field', { hasText: 'Submitted by:' }).first().innerText()
+    ).trim()
+    expect(submittedBy).not.toMatch(/Submitted by:\s*$/)
+    expect(submittedBy).toContain('Kristine')
+  })
+
+  test('renders a graceful fallback when submitter and date are missing (no 1970, no blank)', async ({ page }) => {
+    // A legacy pre-#58 row can have null submitter/date; it must never show "1 Jan 1970" or an empty field.
+    await page.route('**/admin/pending-playgrounds', (route) =>
+      route.fulfill({ json: [{ ...MOCK_PENDING, submitterName: null, submittedByUserId: null, createdAt: null }] })
+    )
+    await page.goto('/admin/review')
+    await expect(page.getByText('New Leikeplass')).toBeVisible()
+
+    const dateText = (await page.locator('.card-date').first().innerText()).trim()
+    expect(dateText.length).toBeGreaterThan(0)
+    expect(dateText).not.toContain('1970')
+    expect(dateText).toBe('Unknown date')
+
+    const submittedBy = (
+      await page.locator('p.card-field', { hasText: 'Submitted by:' }).first().innerText()
+    ).trim()
+    expect(submittedBy).not.toMatch(/Submitted by:\s*$/)
+    expect(submittedBy).toContain('Unknown')
   })
 
   test('approve removes the pending card', async ({ page }) => {

@@ -35,7 +35,7 @@ type PendingPlayground = {
   name: string | null
   latitude: number
   longitude: number
-  submittedByUserId: string
+  submittedByUserId: string | null
   submitterName: string | null
   equipment: string[]
   ageSuitability: string[]
@@ -43,7 +43,7 @@ type PendingPlayground = {
   otherEquipment: string | null
   transportInfo: string | null
   notes: string | null
-  createdAt: string
+  createdAt: string | null
 }
 
 type FlaggedPlayground = {
@@ -55,12 +55,17 @@ type FlaggedPlayground = {
   latestFlaggedAt: string
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  // Guard a null/invalid timestamp: new Date(null) is the epoch, which would render as
+  // "1 Jan 1970". Pre-#58 user-submitted rows have no resolvable submitter/date.
+  if (!iso) return 'Unknown date'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return 'Unknown date'
   return new Intl.DateTimeFormat('en-GB', {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
-  }).format(new Date(iso))
+  }).format(date)
 }
 
 function SubmissionCard({
@@ -237,7 +242,7 @@ function PendingPlaygroundCard({
 
       <p className="card-field">
         <span className="field-label">Submitted by:</span>{' '}
-        {playground.submitterName ?? playground.submittedByUserId}
+        {playground.submitterName ?? playground.submittedByUserId ?? 'Unknown'}
       </p>
 
       {playground.equipment.length > 0 && (
