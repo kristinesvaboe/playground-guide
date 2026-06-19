@@ -12,14 +12,20 @@ body {
 
 .admin-page h1 {
   font-size: 1.4rem;
-  margin: 0 0 20px;
+  /* Separation lives above the heading (between sections); the gap to a section's own
+     content stays tight so heading + content read as one unit. */
+  margin: 28px 0 10px;
   color: #111;
+}
+
+.admin-page h1:first-child {
+  margin-top: 0;
 }
 
 .admin-status {
   text-align: center;
   color: #666;
-  margin-top: 48px;
+  margin-top: 8px;
 }
 
 .admin-error {
